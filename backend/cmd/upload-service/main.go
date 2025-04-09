@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http" // Import the net/http package for status codes
+	"net/http"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -29,7 +29,6 @@ func main() {
 		log.Printf("Local Storage Path: %s", cfg.LocalstoragePath)
 	}
 
-	// --- Initialize Gin Router ---
 	// Set Gin mode based on environment
 	if cfg.Environment == "production" {
 		gin.SetMode(gin.ReleaseMode)

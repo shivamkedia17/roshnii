@@ -7,25 +7,17 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Config holds all configuration parameters for the application.
-// It uses 'mapstructure' tags to specify the corresponding key in the config source (env vars, file).
 type Config struct {
-	// --- General ---
 	// Environment defines the running environment (e.g., "development", "staging", "production")
 	Environment string `mapstructure:"ENVIRONMENT"`
 
-	// LogLevel sets the logging level (e.g., "debug", "info", "warn", "error")
 	LogLevel string `mapstructure:"LOG_LEVEL"`
 
-	// --- Server (Common for multiple services) ---
-	// ServerPort is the port the specific service will listen on. Each service might override this.
 	ServerPort string `mapstructure:"SERVER_PORT"`
 
 	// --- Databases ---
 	PostgresURL string `mapstructure:"POSTGRES_URL"`
 	QdrantURL   string `mapstructure:"QDRANT_URL"`
-	// QdrantAPIKey is optional, depending on your Qdrant setup.
-	QdrantAPIKey string `mapstructure:"QDRANT_API_KEY"`
 
 	// --- Storage ---
 	// BlobStorageType specifies the provider (e.g., "s3", "gcs", "azure", "local").
@@ -47,10 +39,6 @@ type Config struct {
 	// EmbeddingServiceURL    string `mapstructure:"EMBEDDING_SERVICE_URL"` // Python service
 	// FaceRecServiceURL      string `mapstructure:"FACE_REC_SERVICE_URL"`    // Python service
 	// SearchServiceURL       string `mapstructure:"SEARCH_SERVICE_URL"`
-
-	// --- Message Queue (Optional) ---
-	// MessageQueueURL string `mapstructure:"MESSAGE_QUEUE_URL"`
-	// Add specific queue/topic names if needed
 }
 
 // LoadConfig loads configuration from file and environment variables.
@@ -69,9 +57,7 @@ func LoadConfig(path string) (config *Config, err error) {
 	viper.AddConfigPath(path) // e.g., "." for the current directory
 
 	// Tell viper the name of the config file (without extension).
-	viper.SetConfigName("app") // Will look for "app.env" or "app.yaml" etc.
-	// OR specific name like ".env" - viper needs SetConfigFile explicitly then
-	// viper.SetConfigFile(".env")
+	viper.SetConfigName("app")
 
 	// Tell viper the type of the config file.
 	viper.SetConfigType("env") // ".env" file format
