@@ -1,0 +1,101 @@
+openapi: "3.0.0"
+info:
+    title: "Roshnii API"
+    version: "0.0.1"
+    description: "OpenAPI spec for the backend including endpoints for OAuth login, logout, upload, and view."
+servers:
+    - url: "http://localhost:8000"
+      description: "Dev server"
+paths:
+    /oauth/google/login:
+        post:
+            summary: "OAuth Login"
+            description: "Authenticate a user using OAuth."
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                provider:
+                                    type: string
+                            required:
+                                - provider
+            responses:
+                "200":
+                    description: "Successful OAuth login"
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/AuthResponse"
+                "401":
+                    description: "Unauthorized"
+    /oauth/google/logout:
+        post:
+            summary: "Logout"
+            description: "Logout the authenticated user."
+            responses:
+                "200":
+                    description: "Successful logout"
+                "401":
+                    description: "Unauthorized"
+    /upload:
+        post:
+            summary: "Upload"
+            description: "Upload an image."
+            requestBody:
+                required: true
+                content:
+                    multipart/form-data:
+                        schema:
+                            type: object
+                            properties:
+                                file:
+                                    type: string
+                                    format: binary
+                            required:
+                                - file
+            responses:
+                "201":
+                    description: "File uploaded successfully"
+                "400":
+                    description: "Bad request"
+    /view:
+        get:
+            summary: "View Resource"
+            description: "Retrieve details of a resource."
+            parameters:
+                - name: id
+                  in: query
+                  description: "ID of the resource to view"
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "200":
+                    description: "Resource retrieved successfully"
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Resource"
+                "404":
+                    description: "Resource not found"
+components:
+    schemas:
+        AuthResponse:
+            type: object
+            properties:
+                token:
+                    type: string
+                expires_in:
+                    type: integer
+        Resource:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
