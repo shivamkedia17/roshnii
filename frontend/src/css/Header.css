@@ -1,0 +1,40 @@
+.photo-gallery {
+    padding: 20px;
+}
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.photo-item {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    aspect-ratio: 1;
+}
+
+.photo-item:hover {
+    transform: scale(1.02);
+}
+
+.photo-thumbnail {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.no-photos {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+.loading,
+.error {
+    text-align: center;
+    padding: 40px;
+}
