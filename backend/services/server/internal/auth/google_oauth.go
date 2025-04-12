@@ -1,5 +1,21 @@
 package auth
 
+import (
+	"context"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"honnef.co/go/tools/config"
+)
+
 // GoogleOAuthService holds the OAuth2 configuration along with dependencies.
 type GoogleOAuthService struct {
 	Config     *oauth2.Config
@@ -165,88 +181,3 @@ func (s *GoogleOAuthService) OAuthCallback(c *gin.Context) {
 	// Finally, redirect the user to the SPA.
 	c.Redirect(http.StatusTemporaryRedirect, "/")
 }
-
-──────────────────────────────
-Step 3. Wire Up the OAuth Endpoints in the Router
-──────────────────────────────
-In your backend router (for example, using Gin), add routes that call the methods above.
-
-For example, in your main router file (e.g., internal/server/router.go):
-
---------------------------------------------------
-router.GET("/api/auth/google/login", googleOAuthService.OAuthLogin)
-router.GET("/api/auth/google/callback", googleOAuthService.OAuthCallback)
---------------------------------------------------
-
-Make sure your configuration (including cfg.GoogleClientID and cfg.GoogleClientSecret) is loaded before initializing the GoogleOAuthService.
-
-──────────────────────────────
-Step 4. Update Your User Database Model
-──────────────────────────────
-Ensure your user table (or equivalent) has a unique field for the email address. The mapping is as follows:
-• OAuth callback returns GoogleUser.Email.
-• In your application’s user table, this email becomes the unique identifier (or is used to lookup associated user_id).
-
-In models/model.go (or your user model file), you might have:
---------------------------------------------------
-type User struct {
-    ID       int64  `json:"id"`
-    Username string `json:"username"`
-    Email    string `json:"email"`  // Add this field if not already present.
-    // ... other fields ...
-}
---------------------------------------------------
-
-──────────────────────────────
-Step 5. Frontend: Triggering the Login Flow
-──────────────────────────────
-On the frontend, update your Login component (components/auth/Login.tsx) so that the “Sign in with Google” button redirects the user to the backend API endpoint that initiates OAuth.
-
-For example:
---------------------------------------------------
-export function Login() {
-  const handleGoogleLogin = () => {
-    // This URL will trigger your backend's "/api/auth/google/login" endpoint.
-    window.location.href = "/api/auth/google/login";
-  };
-
-  return (
-    <div className="login-container">
-      <div className="login-card">
-        <h1>Roshnii</h1>
-        <p>Store and organize your memories</p>
-        <button className="google-login-btn" onClick={handleGoogleLogin}>
-          Sign in with Google
-        </button>
-      </div>
-    </div>
-  );
-}
---------------------------------------------------
-Step 6. Finalize Session Handling
-──────────────────────────────
-1. Upon receiving the callback and setting the auth_token cookie, the SPA should check for the token existence (either via a dedicated API endpoint or from cookies) and update the authentication context accordingly.
-2. On each authenticated API call, send the JWT (the cookie is automatically included if using cookie-based auth) so that your backend can validate the session.
-
-──────────────────────────────
-Summary
-──────────────────────────────
-• Configure Google OAuth credentials and add them to your backend configuration.
-• Implement an OAuth service in Go that handles login and callback, mapping the Google email to your user record.
-• Wire the endpoints in your Gin router.
-• On the frontend, have the login button redirect to the backend OAuth endpoint.
-• After OAuth, use a JWT token (typically stored in an HTTP-only cookie or passed via the URL fragment) for maintaining the session in your React SPA.
-
-By following these steps, your application will leverage Google OAuth for login while ensuring that each user’s email is mapped correctly to their database record, and the user receives a JWT for subsequent API requests.
-Which OAuth grant type have you given instructions for? Is it a good idea to use in a single page app wiht an API-based backend?
-The instructions provided implement the standard Authorization Code Grant Flow. In this flow, your backend acts as a confidential client that performs the code exchange securely with Google (using your client secret), then generates its own JWT for the SPA.
-
-For a single-page app with an API-based backend, this approach is good—provided that:
-
-• The sensitive parts of the OAuth flow (code exchange, handling the client secret, etc.) occur on the backend rather than in the SPA.
-
-• You secure the communication and token storage (for example, using HTTP-only cookies for the JWT).
-
-If you were to build a public client (a pure SPA) without a secure backend handling secrets, you’d need to use the Authorization Code Flow with PKCE (Proof Key for Code Exchange) instead. PKCE protects against interception attacks when the client cannot safely store a secret.
-
-In summary, using the standard Authorization Code Grant Flow as shown is a good idea when your backend is an API server that securely handles the OAuth code exchange. It keeps your client secret secure and makes it easier to manage user sessions.
