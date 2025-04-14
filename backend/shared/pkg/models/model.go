@@ -1,63 +1,48 @@
 package models
 
-type UserID = int64
-type ImageID = string
+import "time" // Added	// Added	// Added	// Added	// Added	// Added	// Added	// Added
+
+type (
+	UserID  = int64
+	ImageID = string // Consider using UUID later if needed
+)
 
 // User represents a registered user in the system.
 type User struct {
-	ID           UserID `json:"id"` // Auto-generated unique user id
-	Email        string `json:"email"`
-	Name         string `json:"username"`      // User's display name
-	AuthProvider string `json:"auth_provider"` // OAuth Identity Provider
-	// The "-" tag prevents this field from being included in JSON responses.
-	PasswordHash string `json:"-"`
+	ID           UserID    `json:"id" db:"id"`       // Auto-generated unique user id
+	GoogleID     string    `json:"-" db:"google_id"` // Store Google's unique ID
+	Email        string    `json:"email" db:"email"`
+	Name         string    `json:"name" db:"name"`               // User's display name from Google
+	PictureURL   string    `json:"picture_url" db:"picture_url"` // Profile picture URL from Google
+	AuthProvider string    `json:"-" db:"auth_provider"`         // e.g., "google"
+	CreatedAt    time.Time `json:"-" db:"created_at"`
+	UpdatedAt    time.Time `json:"-" db:"updated_at"`
+	// PasswordHash string    `json:"-" db:"password_hash"` // Not needed for pure OAuth
 }
 
 // ImageMetadata holds information about an uploaded image.
-type ImageMetadataCore struct {
-	ID          ImageID `json:"id"` // Auto-generated unique image id
-	UserID      UserID  `json:"user_id"`
-	Filename    string  `json:"filename"`     // o.g name of the uploaded file
-	StoragePath string  `json:"-"`            // blob-storage path
-	ContentType string  `json:"content_type"` // MIME type of the image (e.g., "image/jpeg", "image/png").
-	Size        int64   `json:"size"`
-	Width       int     `json:"width,omitempty"`  // (May be populated later if not available at upload)
-	Height      int     `json:"height,omitempty"` //(May be populated later if not available at upload)
+type ImageMetadata struct {
+	ID          ImageID   `json:"id" db:"id"` // UUID or other unique ID
+	UserID      UserID    `json:"user_id" db:"user_id"`
+	Filename    string    `json:"filename" db:"filename"`         // Original filename
+	StoragePath string    `json:"-" db:"storage_path"`            // Path in blob storage
+	ContentType string    `json:"content_type" db:"content_type"` // MIME type
+	Size        int64     `json:"size" db:"size"`                 // Size in bytes
+	Width       int       `json:"width,omitempty" db:"width"`
+	Height      int       `json:"height,omitempty" db:"height"`
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+
+	// Add other fields later as needed (phash, taken_at, etc.)
 }
 
-//
-
-// type ImageMetadataAdditional struct {
-// 	// PHash is the perceptual hash of the image, used for deduplication.
-// 	// Using a pointer allows us to represent the state where the hash hasn't been calculated yet.
-// 	PHash       *string `json:"-"`
-// 	IsDuplicate bool    `json:"is_duplicate"`
-
-// 	// OriginalID points to the ID of the original image if this one is a duplicate.
-// 	// Using a pointer allows us to represent non-duplicates (nil value).
-// 	OriginalID *string `json:"original_id,omitempty"`
-
-// 	// UploadedAt timestamp indicates when the image was successfully uploaded and metadata created.
-// 	UploadedAt time.Time `json:"uploaded_at"`
-
-// 	// TakenAt represents the date and time the photo was actually taken, often extracted from EXIF data.
-// 	// Using a pointer as it might not always be available.
-// 	TakenAt *time.Time `json:"taken_at,omitempty"`
-
-// 	// Location represents geo-coordinates extracted from EXIF data. Could be a nested struct or separate fields.
-// 	// Example:
-// 	// Latitude *float64 `json:"latitude,omitempty"`
-// 	// Longitude *float64 `json:"longitude,omitempty"`
-
-// 	// NeedsEmbedding indicates if the embedding needs to be generated (or regenerated).
-// 	// Useful for background job processing. Could also be managed via message queues.
-// 	// NeedsEmbedding bool `json:"-"`
-
-// 	// NeedsClustering indicates if the image needs to be considered in the next face clustering run.
-// 	// NeedsClustering bool `json:"-"`
-// }
-
-// Potential other structs could go here later, e.g.:
-// - FaceCluster
-// - Album
-// - APIRequest/Response specific structs if needed
+type GoogleUser struct {
+	ID            string `json:"sub"`            // Google's unique subject identifier
+	Email         string `json:"email"`          // User's email address
+	VerifiedEmail bool   `json:"email_verified"` // Whether Google has verified the email
+	Name          string `json:"name"`           // User's full name
+	GivenName     string `json:"given_name"`     // First name
+	FamilyName    string `json:"family_name"`    // Last name
+	Picture       string `json:"picture"`        // URL to profile picture
+	Locale        string `json:"locale"`         // e.g., "en"
+}

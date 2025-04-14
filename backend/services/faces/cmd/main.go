@@ -1,8 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 func main() {
-    fmt.Println("Starting faces microservice...")
-    // Initialize your service here
+	fmt.Println("Starting faces microservice...")
+	// Initialize your service here
 }
