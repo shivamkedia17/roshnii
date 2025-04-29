@@ -1,19 +1,19 @@
 package models
 
-import "time" // Added	// Added	// Added	// Added	// Added	// Added	// Added	// Added
+import "time"
 
 type (
 	UserID  = int64
-	ImageID = string // Consider using UUID later if needed
+	ImageID = string // Considering using UUID later if needed
 )
 
 // User represents a registered user in the system.
 type User struct {
 	ID           UserID    `json:"id" db:"id"`       // Auto-generated unique user id
-	GoogleID     string    `json:"-" db:"google_id"` // Store Google's unique ID
+	GoogleID     *string   `json:"-" db:"google_id"` // Store Google's unique ID
 	Email        string    `json:"email" db:"email"`
 	Name         string    `json:"name" db:"name"`               // User's display name from Google
-	PictureURL   string    `json:"picture_url" db:"picture_url"` // Profile picture URL from Google
+	PictureURL   *string   `json:"picture_url" db:"picture_url"` // Profile picture URL from Google
 	AuthProvider string    `json:"-" db:"auth_provider"`         // e.g., "google"
 	CreatedAt    time.Time `json:"-" db:"created_at"`
 	UpdatedAt    time.Time `json:"-" db:"updated_at"`
@@ -32,8 +32,6 @@ type ImageMetadata struct {
 	Height      int       `json:"height,omitempty" db:"height"`
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
-
-	// Add other fields later as needed (phash, taken_at, etc.)
 }
 
 type GoogleUser struct {
@@ -45,4 +43,43 @@ type GoogleUser struct {
 	FamilyName    string `json:"family_name"`    // Last name
 	Picture       string `json:"picture"`        // URL to profile picture
 	Locale        string `json:"locale"`         // e.g., "en"
+}
+
+// Album represents a collection of images grouped by a user.
+type Album struct {
+	ID        int64     `json:"id" db:"id"`
+	UserID    UserID    `json:"user_id" db:"user_id"`
+	Name      string    `json:"name" db:"name"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// AlbumImage links images to albums (many-to-many).
+type AlbumImage struct {
+	AlbumID int64   `json:"album_id" db:"album_id"`
+	ImageID ImageID `json:"image_id" db:"image_id"`
+}
+
+// Tag represents a user-defined tag for organizing images.
+type Tag struct {
+	ID        int64     `json:"id" db:"id"`
+	UserID    UserID    `json:"user_id" db:"user_id"`
+	Name      string    `json:"name" db:"name"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+// ImageTag links tags to images (many-to-many).
+type ImageTag struct {
+	ImageID ImageID `json:"image_id" db:"image_id"`
+	TagID   int64   `json:"tag_id" db:"tag_id"`
+}
+
+// Share represents sharing an image or album with another user.
+type Share struct {
+	ID         int64     `json:"id" db:"id"`
+	OwnerID    UserID    `json:"owner_id" db:"owner_id"`
+	TargetType string    `json:"target_type" db:"target_type"` // "image" or "album"
+	TargetID   string    `json:"target_id" db:"target_id"`     // ImageID or AlbumID (as string)
+	SharedWith UserID    `json:"shared_with" db:"shared_with"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
 }

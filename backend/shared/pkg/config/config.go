@@ -3,7 +3,7 @@ package config
 import (
 	"log"
 	"strings"
-	"time" // Added for TokenDuration
+	"time"
 
 	"github.com/spf13/viper"
 )
@@ -35,8 +35,6 @@ type Config struct {
 	GoogleClientID     string `mapstructure:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret string `mapstructure:"GOOGLE_CLIENT_SECRET"`
 	FrontendURL        string `mapstructure:"FRONTEND_URL"` // To redirect back after OAuth
-
-	// ... (Service URLs if needed later)
 }
 
 // LoadConfig loads configuration from file and environment variables.

@@ -1,0 +1,62 @@
+# backend/docker-compose.test.yml
+version: '3.8'
+
+services:
+  # Test Database Service (Separate from dev db)
+  test-db:
+    image: postgres:15-alpine
+    container_name: roshnii-postgres-test
+    environment:
+      POSTGRES_USER: ${TEST_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${TEST_POSTGRES_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d 
+      # NO persistent volume for test data
+    healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${TEST_POSTGRES_USER} -d ${TEST_POSTGRES_DB}"]
+        interval: 5s
+        timeout: 5s
+        retries: 5
+    networks:
+      - test_network
+
+  # Service specifically to run Go tests inside a container
+  backend-test-runner:
+    # Use the base Go image directly, instead of building the final app image
+    image: golang:1.23-alpine 
+    container_name: roshnii-backend-test-runner
+    depends_on:
+      test-db:
+        condition: service_healthy 
+    environment:
+      ENVIRONMENT: development # Dev mode needed for /dev/login
+      POSTGRES_URL: ${TEST_POSTGRES_URL} # Connect to the TEST database service
+      JWT_SECRET: ${JWT_SECRET}
+      TOKEN_DURATION: ${TOKEN_DURATION}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL}
+    volumes:
+      # Mount the entire project source code into a work directory inside the container
+      - .:/app 
+      - go_cache:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build # Or a specific path for the build cache if needed
+    # Set the working directory to where the source code is mounted
+    working_dir: /app 
+    # Override the default CMD to run tests
+    # The path is now relative to the working_dir (/app)
+    command: ["go", "test", "-v", "./services/server/cmd/..."] # <-- Path is correct relative to /app
+    networks:
+      - test_network
+
+# Volumes for test runner cache and persistent dev data
+volumes:
+  go_cache:
+  go_build_cache:
+  # postgres_dev_data: # This volume is only needed by the dev DB in docker-compose.yml
+
+networks:
+  test_network: {}

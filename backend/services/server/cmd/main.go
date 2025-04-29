@@ -41,6 +41,10 @@ func main() {
 
 	// 5. Initialize Handlers
 	imageHandler := handlers.NewImageHandler(database /*storageService,*/, cfg)
+	albumHandler := handlers.NewAlbumHandler(database, cfg)
+	tagHandler := handlers.NewTagHandler(database, cfg)
+	shareHandler := handlers.NewShareHandler(database, cfg)
+	searchHandler := handlers.NewSearchHandler(database, cfg)
 
 	// 6. Setup Gin Engine
 	if cfg.Environment == "production" {
@@ -123,6 +127,10 @@ func main() {
 
 		// --- Image Routes (already includes auth middleware via RegisterRoutes) ---
 		imageHandler.RegisterRoutes(api, authMW)
+		albumHandler.RegisterRoutes(api, authMW)
+		tagHandler.RegisterRoutes(api, authMW)
+		shareHandler.RegisterRoutes(api, authMW)
+		searchHandler.RegisterRoutes(api, authMW)
 
 		// --- User Info Route (Example) ---
 		api.GET("/me", authMW, func(c *gin.Context) {

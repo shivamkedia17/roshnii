@@ -5,7 +5,7 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"path/filepath" // To get filename extension
+	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -35,14 +35,16 @@ func NewImageHandler(store db.ImageStore /*storage storage.BlobStorage,*/, cfg *
 
 // RegisterRoutes connects image routes to the Gin engine.
 func (h *ImageHandler) RegisterRoutes(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	// Apply auth middleware to all image routes
-	imageRoutes := router.Group("/images")
-	imageRoutes.Use(authMiddleware)
-	{
-		imageRoutes.POST("", h.HandleUploadImage)
-		imageRoutes.GET("", h.HandleListImages)
-		// Add GET /images/{id}, DELETE /images/{id} later
-	}
+	// Upload endpoint
+	router.POST("/upload", authMiddleware, h.HandleUploadImage)
+	// List user images
+	router.GET("/images", authMiddleware, h.HandleListImages)
+	// Single image metadata
+	router.GET("/image/:id", authMiddleware, h.HandleGetImage)
+	// Download image file
+	router.GET("/image/:id/download", authMiddleware, h.HandleDownloadImage)
+	// Delete image
+	router.DELETE("/image/:id", authMiddleware, h.HandleDeleteImage)
 }
 
 // HandleUploadImage processes image uploads.
@@ -168,3 +170,26 @@ func (h *ImageHandler) HandleListImages(c *gin.Context) {
 	log.Printf("Retrieved %d images for user %d", len(images), userID)
 	c.JSON(http.StatusOK, images)
 }
+
+// HandleGetImage retrieves metadata for a single image.
+func (h *ImageHandler) HandleGetImage(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
+		return
+	}
+	imageID := c.Param("id")
+	meta, err := h.Store.GetImageByID(c.Request.Context(), userID, imageID)
+	if err != nil {
+		if err.Error() == "image not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve image"})
+		return
+	}
+	c.JSON(http.StatusOK, meta)
+}
+
+func (h *ImageHandler) HandleDeleteImage(c *gin.Context)   {}
+func (h *ImageHandler) HandleDownloadImage(c *gin.Context) {}

@@ -2,15 +2,15 @@ package db
 
 import (
 	"context"
-	"errors" // Import errors package
+	"errors"
 	"log"
 	"time"
 
-	"github.com/jackc/pgx/v5"        // Import pgx
-	"github.com/jackc/pgx/v5/pgconn" // For checking specific errors
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/shivamkedia17/roshnii/shared/pkg/models" // Adjust import path
+	"github.com/shivamkedia17/roshnii/shared/pkg/models"
 )
 
 // Store defines the database operations.
@@ -32,7 +32,8 @@ type UserStore interface {
 type ImageStore interface {
 	CreateImageMetadata(ctx context.Context, meta *models.ImageMetadata) error
 	ListImagesByUserID(ctx context.Context, userID models.UserID) ([]models.ImageMetadata, error)
-	// Add other image methods if needed, e.g., GetImageByID
+	// GetImageByID retrieves metadata for a given image ID and user.
+	GetImageByID(ctx context.Context, userID models.UserID, imageID models.ImageID) (*models.ImageMetadata, error)
 }
 
 // PostgresStore holds the connection pool for PostgreSQL interactions.
@@ -238,4 +239,27 @@ func (s *PostgresStore) ListImagesByUserID(ctx context.Context, userID models.Us
 		images = []models.ImageMetadata{}
 	}
 	return images, nil
+}
+
+// GetImageByID retrieves metadata for a single image belonging to a user.
+func (s *PostgresStore) GetImageByID(ctx context.Context, userID models.UserID, imageID models.ImageID) (*models.ImageMetadata, error) {
+	log.Printf("DB: GetImageByID called for UserID: %d, ImageID: %s", userID, imageID)
+
+	query := `
+        SELECT id, user_id, filename, storage_path, content_type, size, width, height, created_at, updated_at
+        FROM images
+        WHERE user_id = $1 AND id = $2`
+
+	var img models.ImageMetadata
+	err := s.Pool.QueryRow(ctx, query, userID, imageID).Scan(
+		&img.ID, &img.UserID, &img.Filename, &img.StoragePath, &img.ContentType,
+		&img.Size, &img.Width, &img.Height, &img.CreatedAt, &img.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, errors.New("image not found")
+		}
+		return nil, err
+	}
+	return &img, nil
 }
