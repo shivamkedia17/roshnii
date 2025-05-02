@@ -1,2 +1,3 @@
 oauth_creds
 .DS_Store
+.env*

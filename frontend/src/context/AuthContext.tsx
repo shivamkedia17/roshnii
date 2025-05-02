@@ -7,6 +7,8 @@ import {
 } from "react";
 import {} from "react";
 
+import { authAPI } from "@/services/api";
+
 type AuthContextType = {
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -32,8 +34,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check if user is logged in
     async function checkAuth() {
       try {
-        // Call to your backend to verify authentication
-        const response = await fetch("/api/user");
+        setIsLoading(true);
+
+        // Check for token from dev login
+        const devToken = localStorage.getItem("auth_token");
+
+        if (devToken) {
+          try {
+            // Use the token for /me request
+            const response = await fetch("/api/me", {
+              headers: {
+                Authorization: `Bearer ${devToken}`,
+              },
+            });
+
+            if (response.ok) {
+              const userData = await response.json();
+              setUser(userData);
+              setIsAuthenticated(true);
+              return;
+            }
+          } catch (error) {
+            console.error("Dev token validation failed:", error);
+            localStorage.removeItem("auth_token");
+          }
+        }
+
+        // Fall back to regular cookie-based auth check
+        const response = await fetch("/api/me", {
+          credentials: "include",
+        });
+
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
@@ -50,11 +81,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   function login() {
-    window.location.href = "/api/login";
+    authAPI.login();
   }
 
   async function logout() {
-    await fetch("/api/logout");
+    authAPI.logout();
     setIsAuthenticated(false);
     setUser(null);
   }

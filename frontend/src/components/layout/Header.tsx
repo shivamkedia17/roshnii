@@ -1,44 +1,51 @@
 import { useState } from "react";
+import { HeaderProps } from "@/types";
 import "../../css/Header.css";
-
-interface HeaderProps {
-  onToggleSidebar: () => void;
-  onSearch: (query: string) => void;
-}
 
 export function Header({ onToggleSidebar, onSearch }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
-  const handleSearch = (e: React.FormEvent) => {
+  function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     onSearch(searchQuery);
-  };
+  }
 
   return (
     <header className="app-header">
       <div className="header-left">
+        <h3 className="app-title">Roshnii</h3>
         <button className="menu-toggle" onClick={onToggleSidebar}>
-          <span className="menu-icon">☰</span>
+          <span className="menu-icon">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              stroke="currentColor"
+              strokeWidth="1.2"
+              strokeLinecap="round"
+              className="hamburger"
+            >
+              <g id="SVGRepo_iconCarrier">
+                <path d="M20 7L4 7"></path>
+                <path d="M20 12L4 12"></path>
+                <path d="M20 17L4 17"></path>
+              </g>
+            </svg>
+          </span>
+          <span>Menu</span>
         </button>
-        <h1 className="app-title">Roshnii Photos</h1>
       </div>
-
-      <form className="search-form" onSubmit={handleSearch}>
-        <input
-          type="text"
-          placeholder="Search photos..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <button type="submit">Search</button>
-      </form>
-
-      <div className="user-menu">
-        <img
-          className="user-avatar"
-          src="/profile-placeholder.jpg"
-          alt="Profile"
-        />
+      <div className="header-center">
+        <form className="search-form" onSubmit={handleSearch}>
+          <input
+            type="text"
+            placeholder="Search photos..."
+            value={searchQuery}
+            className="search-bar"
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <button type="submit">🔍</button>
+        </form>
       </div>
     </header>
   );

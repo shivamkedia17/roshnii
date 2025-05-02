@@ -3,9 +3,10 @@ import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { Gallery } from "../photos/Gallery";
 import { AlbumList } from "../albums/AlbumList";
-// import { AlbumView } from "../albums/AlbumView";
 import { UploadForm } from "../upload/UploadForm";
-import "../../css/Layout.css";
+import { AlbumView } from "../albums/AlbumView";
+
+import "@/css/MainLayout.css";
 
 export function MainLayout() {
   const [activeView, setActiveView] = useState("photos");
@@ -13,27 +14,32 @@ export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const renderMainContent = () => {
+  function renderMainContent() {
     switch (activeView) {
-      case "photos":
+      case "photos": // TODO
         return <Gallery searchQuery={searchQuery} />;
-      case "albums":
+      case "albums": // TODO
         return selectedAlbumId ? (
-          <AlbumDetail
+          <AlbumView
             albumId={selectedAlbumId}
             onBack={() => setSelectedAlbumId(null)}
           />
         ) : (
           <AlbumList onSelectAlbum={setSelectedAlbumId} />
         );
-      case "upload":
+      case "upload": // TODO
         return <UploadForm onComplete={() => setActiveView("photos")} />;
-      case "search":
+      case "search": // TODO
         return <Gallery searchQuery={searchQuery} />;
+      case "profile": // TODO
+        return <></>;
+      case "logout": // TODO
+        return <></>;
+
       default:
         return <Gallery searchQuery={searchQuery} />;
     }
-  };
+  }
 
   return (
     <div className="main-layout">
@@ -47,9 +53,14 @@ export function MainLayout() {
           activeView={activeView}
           onNavigate={setActiveView}
         />
-        <main className={`main-content ${sidebarOpen ? "sidebar-open" : ""}`}>
-          {renderMainContent()}
-        </main>
+        {/* Only show overlay on mobile */}
+        {sidebarOpen && (
+          <div
+            className={`sidebar-overlay ${sidebarOpen ? "visible" : ""}`}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <main className={`main-content `}>{renderMainContent()}</main>
       </div>
     </div>
   );

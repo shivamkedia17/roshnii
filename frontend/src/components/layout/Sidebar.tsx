@@ -1,35 +1,47 @@
+import { SidebarProps } from "@/types";
 import "../../css/Sidebar.css";
-
-interface SidebarProps {
-  isOpen: boolean;
-  activeView: string;
-  onNavigate: (view: string) => void;
-}
 
 export function Sidebar({ isOpen, activeView, onNavigate }: SidebarProps) {
   return (
     <aside className={`sidebar ${isOpen ? "open" : "closed"}`}>
       <nav className="sidebar-nav">
-        <ul>
-          <li className={activeView === "photos" ? "active" : ""}>
-            <button onClick={() => onNavigate("photos")}>
-              <span className="icon">📷</span>
-              <span className="label">Photos</span>
-            </button>
-          </li>
-          <li className={activeView === "albums" ? "active" : ""}>
-            <button onClick={() => onNavigate("albums")}>
-              <span className="icon">📁</span>
-              <span className="label">Albums</span>
-            </button>
-          </li>
-          <li className={activeView === "upload" ? "active" : ""}>
-            <button onClick={() => onNavigate("upload")}>
-              <span className="icon">⬆️</span>
-              <span className="label">Upload</span>
-            </button>
-          </li>
-        </ul>
+        <button
+          className={activeView === "photos" ? "active" : ""}
+          onClick={() => onNavigate("photos")}
+        >
+          <span className="icon">📷</span>
+          <span className="label">Photos</span>
+        </button>
+        <button
+          className={activeView === "albums" ? "active" : ""}
+          onClick={() => onNavigate("albums")}
+        >
+          <span className="icon">📁</span>
+          <span className="label">Albums</span>
+        </button>
+        <button
+          className={activeView === "upload" ? "active" : ""}
+          onClick={() => onNavigate("upload")}
+        >
+          <span className="icon">⬆️</span>
+          <span className="label">Upload</span>
+        </button>
+      </nav>
+
+      <nav className="sidebar-userinfo">
+        <button
+          className={activeView === "profile" ? "active" : ""}
+          onClick={() => onNavigate("profile")}
+        >
+          <span className="icon">👤</span>
+          <span className="label">Profile</span>
+        </button>
+        <button
+          className={activeView === "logout" ? "active" : ""}
+          onClick={() => onNavigate("logout")}
+        >
+          <span className="label">Logout</span>
+        </button>
       </nav>
     </aside>
   );
