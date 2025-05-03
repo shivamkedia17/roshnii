@@ -3,61 +3,47 @@ package handlers
 import (
 	"fmt"
 	"log"
-	"mime/multipart"
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid" // For generating unique image IDs/paths
 
+	"io"
+
 	"github.com/shivamkedia17/roshnii/services/server/internal/middleware" // Adjust import paths
 	"github.com/shivamkedia17/roshnii/shared/pkg/config"
 	"github.com/shivamkedia17/roshnii/shared/pkg/db"
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
+	"github.com/shivamkedia17/roshnii/shared/pkg/storage" // Add this import
 )
 
-// ImageHandler handles image-related API requests.
+// Modify ImageHandler to include storage
 type ImageHandler struct {
-	Store db.ImageStore
-	// Storage  storage.BlobStorage // Add your blob storage interface here later
+	Store     db.ImageStore
+	Storage   storage.BlobStorage // Add storage field
 	AppConfig *config.Config
 }
 
-// NewImageHandler creates a new ImageHandler.
-func NewImageHandler(store db.ImageStore /*storage storage.BlobStorage,*/, cfg *config.Config) *ImageHandler {
+// Modify constructor
+func NewImageHandler(store db.ImageStore, storage storage.BlobStorage, cfg *config.Config) *ImageHandler {
 	return &ImageHandler{
-		Store: store,
-		// Storage: storage,
+		Store:     store,
+		Storage:   storage,
 		AppConfig: cfg,
 	}
 }
 
-// RegisterRoutes connects image routes to the Gin engine.
-func (h *ImageHandler) RegisterRoutes(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	// Upload endpoint
-	router.POST("/upload", authMiddleware, h.HandleUploadImage)
-	// List user images
-	router.GET("/images", authMiddleware, h.HandleListImages)
-	// Single image metadata
-	router.GET("/image/:id", authMiddleware, h.HandleGetImage)
-	// Download image file
-	router.GET("/image/:id/download", authMiddleware, h.HandleDownloadImage)
-	// Delete image
-	router.DELETE("/image/:id", authMiddleware, h.HandleDeleteImage)
-}
-
-// HandleUploadImage processes image uploads.
+// Update HandleUploadImage to store the actual file
 func (h *ImageHandler) HandleUploadImage(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
-		// This should ideally not happen if middleware is working, but check anyway
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
 
-	// Retrieve the file from the form data
-	fileHeader, err := c.FormFile("file") // "file" matches the openapi.yaml spec
+	// Retrieve the file
+	fileHeader, err := c.FormFile("file")
 	if err != nil {
 		log.Printf("Error getting file from form: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Missing or invalid 'file' field in form data"})
@@ -69,6 +55,7 @@ func (h *ImageHandler) HandleUploadImage(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Uploaded file is empty"})
 		return
 	}
+
 	// Limit file size (e.g., 20MB)
 	const maxUploadSize = 20 * 1024 * 1024
 	if fileHeader.Size > maxUploadSize {
@@ -88,64 +75,157 @@ func (h *ImageHandler) HandleUploadImage(c *gin.Context) {
 		return
 	}
 
-	log.Printf("Received upload: Filename=%s, Size=%d, ContentType=%s, UserID=%d",
-		fileHeader.Filename, fileHeader.Size, contentType, userID)
-
-	// Generate a unique ID and storage path for the image
-	imageUUID := uuid.New()       // Generate UUID object
-	imageID := imageUUID.String() // Get string representation
-	fileExt := filepath.Ext(fileHeader.Filename)
-	// Example storage path structure: user_<user_id>/<uuid>.<ext>
-	// Even if not storing locally now, save this path in metadata.
-	storagePath := fmt.Sprintf("user_%d/%s%s", userID, imageID, fileExt)
-
-	// --- TODO: Implement Actual File Storage ---
-	// Open the file just to ensure it's readable, but we won't save it for this MVP step.
+	// Open the file
 	file, err := fileHeader.Open()
 	if err != nil {
-		log.Printf("Error opening uploaded file header: %v", err)
+		log.Printf("Error opening uploaded file: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process uploaded file"})
 		return
 	}
-	defer func(file multipart.File) {
-		_ = file.Close() // Best effort close
-	}(file)
+	defer file.Close()
 
-	// In a real scenario, you would upload `file` to blob storage using `storagePath` here.
-	log.Printf("Placeholder: File [%s] would be saved to storage path: %s", fileHeader.Filename, storagePath)
+	// Generate a unique ID for the image
+	imageID := uuid.New().String()
 
-	// --- Store Metadata in Database ---
-	// Extract Width/Height (optional, requires image decoding library like "image")
-	// e.g., imgConfig, _, err := image.DecodeConfig(file)
-	// For now, we'll leave them as 0/null.
+	// Upload the file to storage
+	storagePath, err := h.Storage.Upload(c.Request.Context(), fileHeader.Filename, userID, file, contentType)
+	if err != nil {
+		log.Printf("Error uploading file to storage: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to store uploaded file"})
+		return
+	}
+
+	// Create metadata in database
 	metadata := &models.ImageMetadata{
-		ID:          imageID, // Use the generated UUID string
+		ID:          imageID,
 		UserID:      userID,
 		Filename:    fileHeader.Filename,
 		StoragePath: storagePath,
 		ContentType: contentType,
 		Size:        fileHeader.Size,
-		Width:       0,          // TODO: Populate later if needed
-		Height:      0,          // TODO: Populate later if needed
-		CreatedAt:   time.Now(), // Let DB handle default
-		UpdatedAt:   time.Now(), // Let DB handle default or trigger
+		Width:       0, // TODO: Extract dimensions if needed
+		Height:      0,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 	}
 
-	// Use the actual DB store method
 	err = h.Store.CreateImageMetadata(c.Request.Context(), metadata)
 	if err != nil {
+		// If DB storage fails, try to clean up the file we just uploaded
+		cleanupErr := h.Storage.Delete(c.Request.Context(), storagePath)
+		if cleanupErr != nil {
+			log.Printf("Warning: Failed to clean up file after DB error: %v", cleanupErr)
+		}
+
 		log.Printf("Error saving image metadata to DB for image %s: %v", imageID, err)
-		// TODO: Consider deleting the uploaded file from storage if DB fails (rollback)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to record image information"})
 		return
 	}
 
-	log.Printf("Successfully saved metadata for image ID: %s", imageID)
+	log.Printf("Successfully uploaded and saved metadata for image ID: %s", imageID)
+	c.JSON(http.StatusCreated, metadata)
+}
 
-	// Fetch the created metadata back from DB to include DB-generated timestamps
-	// For simplicity in MVP, just return the metadata we constructed.
-	// In production, you might query it back or rely on RETURNING clause in SQL.
-	c.JSON(http.StatusCreated, metadata) // Return the metadata of the created image record
+// Implement HandleDownloadImage to serve the actual file
+func (h *ImageHandler) HandleDownloadImage(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
+		return
+	}
+
+	// Get the image ID from the URL
+	imageID := c.Param("id")
+
+	// Get the image metadata from the database
+	meta, err := h.Store.GetImageByID(c.Request.Context(), userID, imageID)
+	if err != nil {
+		if err.Error() == "image not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve image metadata"})
+		return
+	}
+
+	// Get the file from storage
+	file, contentType, err := h.Storage.Download(c.Request.Context(), meta.StoragePath)
+	if err != nil {
+		log.Printf("Error retrieving file from storage: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve image file"})
+		return
+	}
+	defer file.Close()
+
+	// Set the response headers
+	c.Header("Content-Disposition", "inline; filename="+meta.Filename)
+	c.Header("Content-Type", contentType)
+
+	// Stream the file to the response
+	c.Status(http.StatusOK)
+	if _, err := io.Copy(c.Writer, file); err != nil {
+		log.Printf("Error streaming file to response: %v", err)
+		// Can't really do anything here as we've already started writing the response
+	}
+}
+
+// HandleGetImage retrieves metadata for a single image.
+func (h *ImageHandler) HandleGetImage(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
+		return
+	}
+	imageID := c.Param("id")
+	meta, err := h.Store.GetImageByID(c.Request.Context(), userID, imageID)
+	if err != nil {
+		if err.Error() == "image not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve image"})
+		return
+	}
+	c.JSON(http.StatusOK, meta)
+}
+
+func (h *ImageHandler) HandleDeleteImage(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
+		return
+	}
+
+	// Get the image ID from the URL
+	imageID := c.Param("id")
+
+	// Get the image metadata from the database
+	meta, err := h.Store.GetImageByID(c.Request.Context(), userID, imageID)
+	if err != nil {
+		if err.Error() == "image not found" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve image metadata"})
+		return
+	}
+
+	// Delete the file from storage
+	if err := h.Storage.Delete(c.Request.Context(), meta.StoragePath); err != nil {
+		log.Printf("Error deleting file from storage: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image file"})
+		return
+	}
+
+	// Delete the metadata from the database
+	// We need to implement this method in the PostgresStore
+	if err := h.Store.DeleteImageByID(c.Request.Context(), userID, imageID); err != nil {
+		log.Printf("Error deleting image metadata from database: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image metadata"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Image deleted successfully"})
 }
 
 // HandleListImages retrieves images for the logged-in user.
@@ -171,25 +251,16 @@ func (h *ImageHandler) HandleListImages(c *gin.Context) {
 	c.JSON(http.StatusOK, images)
 }
 
-// HandleGetImage retrieves metadata for a single image.
-func (h *ImageHandler) HandleGetImage(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
-		return
-	}
-	imageID := c.Param("id")
-	meta, err := h.Store.GetImageByID(c.Request.Context(), userID, imageID)
-	if err != nil {
-		if err.Error() == "image not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve image"})
-		return
-	}
-	c.JSON(http.StatusOK, meta)
+// RegisterRoutes connects image routes to the Gin engine.
+func (h *ImageHandler) RegisterRoutes(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
+	// Upload endpoint
+	router.POST("/upload", authMiddleware, h.HandleUploadImage)
+	// List user images
+	router.GET("/images", authMiddleware, h.HandleListImages)
+	// Single image metadata
+	router.GET("/image/:id", authMiddleware, h.HandleGetImage)
+	// Download image file
+	router.GET("/image/:id/download", authMiddleware, h.HandleDownloadImage)
+	// Delete image
+	router.DELETE("/image/:id", authMiddleware, h.HandleDeleteImage)
 }
-
-func (h *ImageHandler) HandleDeleteImage(c *gin.Context)   {}
-func (h *ImageHandler) HandleDownloadImage(c *gin.Context) {}

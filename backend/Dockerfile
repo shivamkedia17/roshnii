@@ -14,6 +14,7 @@ COPY . .
 # Build the server application specifically
 WORKDIR /build/services/server/cmd
 RUN CGO_ENABLED=0 GOOS=linux go build -v -o /server_app .
+
 # Build other services if needed in the future
 # WORKDIR /build/services/faces/cmd
 # RUN CGO_ENABLED=0 GOOS=linux go build -v -o /faces_app .
@@ -25,7 +26,9 @@ FROM alpine:latest
 WORKDIR /app
 
 # Copy only the built application binary from the builder stage
+COPY --from=builder /build/db/schema.sql .
 COPY --from=builder /server_app .
+
 # Copy other built services if needed
 # COPY --from=builder /faces_app .
 
@@ -37,4 +40,4 @@ EXPOSE 8080
 
 # Command to run the application
 # We expect configuration via environment variables passed by Docker Compose
-CMD ["./server_app"]
+CMD [ "./server_app" ]

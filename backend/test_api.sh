@@ -124,6 +124,67 @@ echo "--- Testing GET /api/image/non-existent-uuid ---"
 authenticated_request GET "/image/non-existent-uuid"
 echo
 
+echo "--- Testing Album Endpoints ---"
+# Create an album
+echo ">>> POST $API_URL/albums"
+ALBUM_RESPONSE=$(curl -s -X POST \
+    -H "Authorization: Bearer $AUTH_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"Test Album","description":"Created by test script"}' \
+    "$API_URL/albums")
+
+echo "Album Creation Response:"
+echo "$ALBUM_RESPONSE" | jq '.'
+
+# Extract the album ID
+ALBUM_ID=$(echo "$ALBUM_RESPONSE" | jq -r '.id')
+
+if [[ -z "$ALBUM_ID" || "$ALBUM_ID" == "null" ]]; then
+    echo "Error: Failed to get album ID from creation response!"
+    exit 1
+else
+    echo "Successfully created album with ID: $ALBUM_ID"
+fi
+echo
+
+# List all albums
+echo ">>> GET $API_URL/albums"
+authenticated_request GET "/albums"
+echo
+
+# Get specific album
+echo ">>> GET $API_URL/albums/$ALBUM_ID"
+authenticated_request GET "/albums/$ALBUM_ID"
+echo
+
+# Add image to album (assuming we have an uploaded image)
+if [[ -n "$UPLOADED_IMAGE_ID" ]]; then
+    echo ">>> POST $API_URL/albums/$ALBUM_ID/images"
+    authenticated_request POST "/albums/$ALBUM_ID/images" "{\"image_id\":\"$UPLOADED_IMAGE_ID\"}"
+    echo
+
+    # List images in album
+    echo ">>> GET $API_URL/albums/$ALBUM_ID/images"
+    authenticated_request GET "/albums/$ALBUM_ID/images"
+    echo
+
+    # Remove image from album
+    echo ">>> DELETE $API_URL/albums/$ALBUM_ID/images/$UPLOADED_IMAGE_ID"
+    authenticated_request DELETE "/albums/$ALBUM_ID/images/$UPLOADED_IMAGE_ID"
+    echo
+fi
+
+# Update album
+echo ">>> PUT $API_URL/albums/$ALBUM_ID"
+authenticated_request PUT "/albums/$ALBUM_ID" "{\"name\":\"Updated Test Album\",\"description\":\"Updated by test script\"}"
+echo
+
+# Delete album
+echo ">>> DELETE $API_URL/albums/$ALBUM_ID"
+authenticated_request DELETE "/albums/$ALBUM_ID"
+echo
+
+
 # --- 9. Test Logout (Placeholder - Dev login doesn't use cookies easily) ---
 # The dev login gives a token directly. The /logout endpoint primarily clears
 # the cookie. We can call it, but it won't affect our $AUTH_TOKEN variable.

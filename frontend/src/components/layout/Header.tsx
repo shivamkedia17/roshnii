@@ -44,7 +44,7 @@ export function Header({ onToggleSidebar, onSearch }: HeaderProps) {
             className="search-bar"
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <button type="submit">🔍</button>
+          <button type="submit">Search </button>
         </form>
       </div>
     </header>

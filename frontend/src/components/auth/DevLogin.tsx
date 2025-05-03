@@ -1,43 +1,23 @@
-// src/components/auth/DevLogin.tsx
 import { useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useDevLogin } from "@/hooks/useAuthQueries";
 
 export function DevLogin() {
   const [email, setEmail] = useState("testuser@example.com");
   const [name, setName] = useState("Test User");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
 
-  const { login } = useAuth();
+  const devLoginMutation = useDevLogin();
 
   const handleDevLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError("");
+    setLoggingIn(true);
 
     try {
-      const response = await fetch("/api/auth/dev/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, name }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Login failed");
-      }
-
-      const data = await response.json();
-
-      // Store the token in localStorage for use with API requests
-      localStorage.setItem("auth_token", data.token);
-
-      // Refresh the page or update auth state
-      window.location.reload();
-    } catch (err) {
-      setError("Login failed. Please try again.");
-      console.error(err);
+      await devLoginMutation.mutateAsync({ email, name });
+    } catch (error) {
+      console.error("Dev login error:", error);
     } finally {
-      setLoading(false);
+      setLoggingIn(false);
     }
   };
 
@@ -47,7 +27,13 @@ export function DevLogin() {
         <h1>Roshnii</h1>
         <p>Development Login</p>
 
-        {error && <div className="error">{error}</div>}
+        {devLoginMutation.error && (
+          <div className="error">
+            {devLoginMutation.error instanceof Error
+              ? devLoginMutation.error.message
+              : "Login failed. Please try again."}
+          </div>
+        )}
 
         <form onSubmit={handleDevLogin}>
           <div className="form-group">
@@ -58,6 +44,7 @@ export function DevLogin() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+              disabled={loggingIn || devLoginMutation.isPending}
             />
           </div>
 
@@ -69,11 +56,18 @@ export function DevLogin() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
+              disabled={loggingIn || devLoginMutation.isPending}
             />
           </div>
 
-          <button type="submit" disabled={loading}>
-            {loading ? "Logging in..." : "Dev Login"}
+          <button
+            type="submit"
+            disabled={loggingIn || devLoginMutation.isPending || !email}
+            className={loggingIn || devLoginMutation.isPending ? "loading" : ""}
+          >
+            {loggingIn || devLoginMutation.isPending
+              ? "Logging in..."
+              : "Dev Login"}
           </button>
         </form>
 
@@ -82,8 +76,8 @@ export function DevLogin() {
           <p>Or use OAuth (if configured):</p>
           <button
             className="google-login-btn"
-            onClick={login}
-            disabled={loading}
+            onClick={() => (window.location.href = "/api/auth/google/login")}
+            disabled={loggingIn || devLoginMutation.isPending}
           >
             Sign in with Google
           </button>

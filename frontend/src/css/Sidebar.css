@@ -30,3 +30,7 @@
 .label {
     margin-inline-start: var(--margin-m);
 }
+
+.active {
+    background-color: var(--primary-color-light);
+}

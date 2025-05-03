@@ -1,0 +1,93 @@
+services:
+    # Development Database Service
+    db:
+        image: postgres:15-alpine
+        container_name: roshnii-postgres-prod
+        environment:
+            POSTGRES_USER: ${POSTGRES_USER} # Read from .env file
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+            POSTGRES_DB: ${POSTGRES_DB}
+        volumes:
+            - ./db:/docker-entrypoint-initdb.d # Initialize schema on first start
+            - postgres_dev_data:/var/lib/postgresql/data # Persist dev data
+        ports:
+            - "5432:5432" # FIXME Map host 5432 to container 5432 for dev access
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}",
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 5
+        # restart: unless-stopped
+        networks:
+            - prod_network
+
+    # Backend Application Service (Development Mode)
+    backend:
+        build:
+            context: .
+            dockerfile: Dockerfile.prod
+        container_name: roshnii-backend-prod
+        depends_on:
+            db:
+                condition: service_healthy # Wait for DB to be ready based on healthcheck
+        environment:
+            ENVIRONMENT: ${ENVIRONMENT} # Set production mode
+            POSTGRES_URL: ${POSTGRES_URL} # Use the dev DB URL
+            SERVER_HOST: 0.0.0.0 # FIXME
+            SERVER_PORT: 8080 # FIXME
+            PUBLIC_HOST: 127.0.0.1 # FIXME
+            PUBLIC_PORT: 8080 # FIXME
+            JWT_SECRET: ${JWT_SECRET}
+            TOKEN_DURATION: ${TOKEN_DURATION}
+            GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+            GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+            FRONTEND_URL: ${FRONTEND_URL}
+
+            # Add other config vars as needed (e.g., storage path if not default)
+            # LOCAL_STORAGE_PATH: /app/uploads # Example if needed
+        ports:
+            - "8080:8080" # Map host 8080 to container 8080
+        # restart: unless-stopped
+        networks:
+            - prod_network
+
+    # Add Nginx reverse proxy for SSL handling
+    nginx:
+        image: nginx:alpine
+        container_name: roshnii-nginx
+        ports:
+            - "80:80"
+            - "443:443" # For HTTPS
+        volumes:
+            - ./nginx/conf:/etc/nginx/conf.d
+            - ./nginx/certbot/conf:/etc/letsencrypt
+            - ./nginx/certbot/www:/var/www/certbot
+        depends_on:
+            - backend
+            - frontend
+        # restart: unless-stopped
+        networks:
+            - prod_network
+
+    # Static frontend in production mode
+    frontend:
+        build:
+            context: ../frontend
+            dockerfile: Dockerfile.prod # Create this file (see below)
+        container_name: roshnii-frontend-prod
+        restart: unless-stopped
+        networks:
+            - prod_network
+
+# Define the network
+networks:
+    prod_network:
+        driver: bridge
+
+# Define the named volume for persistent dev data
+volumes:
+    postgres_prod_data:

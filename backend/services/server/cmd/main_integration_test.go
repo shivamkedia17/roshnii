@@ -27,6 +27,7 @@ import (
 	"github.com/shivamkedia17/roshnii/shared/pkg/config"
 	"github.com/shivamkedia17/roshnii/shared/pkg/db"
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
+	"github.com/shivamkedia17/roshnii/shared/pkg/storage"
 )
 
 var (
@@ -43,7 +44,7 @@ func TestMain(m *testing.M) {
 	os.Setenv("ENVIRONMENT", "development")
 	// Load config - Make sure it points to a TEST database!
 	// You might need to adjust the path depending on where you run `go test`
-	cfg, err := config.LoadConfig(".") // Or "../.." if running from project root
+	cfg, err := config.LoadConfig("../..") // Or "../.." if running from project root
 	if err != nil {
 		log.Fatalf("FATAL: Failed to load config for testing: %v", err)
 	}
@@ -69,14 +70,36 @@ func TestMain(m *testing.M) {
 	// --- Setup Application Dependencies (like in main.go) ---
 	gin.SetMode(gin.TestMode)
 	router := gin.Default()
+
 	database := &db.PostgresStore{Pool: testDBPool} // Use the concrete type with the test pool
-	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.TokenDuration)
+	var storageService storage.BlobStorage
+	if cfg.BlobStorageType == "local" {
+		localStoragePath := cfg.LocalstoragePath
+		if localStoragePath == "" {
+			localStoragePath = "./uploads" // Default path
+		}
+
+		var err error
+		storageService, err = storage.NewLocalStorage(localStoragePath)
+		if err != nil {
+			log.Fatalf("Failed to initialize local storage: %v", err)
+		}
+		log.Printf("Using local file storage at: %s", localStoragePath)
+	} else {
+		// For now, fall back to local storage if type is unrecognized
+		log.Printf("Unrecognized storage type '%s', using local storage", cfg.BlobStorageType)
+		storageService, _ = storage.NewLocalStorage("./uploads")
+	}
+
+	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.JWTRefreshSecret, cfg.TokenDuration)
 	googleOAuthService := auth.NewGoogleOAuthService(cfg, database, jwtService)
-	imageHandler := handlers.NewImageHandler(database, cfg) // Pass the DB store interface
-	albumHandler := handlers.NewAlbumHandler(database, cfg)
-	tagHandler := handlers.NewTagHandler(database, cfg)
-	shareHandler := handlers.NewShareHandler(database, cfg)
-	searchHandler := handlers.NewSearchHandler(database, cfg)
+
+	imageHandler := handlers.NewImageHandler(database, storageService, cfg) // Pass the DB store interface
+
+	// albumHandler := handlers.NewAlbumHandler(database, cfg)
+	// tagHandler := handlers.NewTagHandler(database, cfg)
+	// shareHandler := handlers.NewShareHandler(database, cfg)
+	// searchHandler := handlers.NewSearchHandler(database, cfg)
 	authMW := middleware.AuthMiddleware(jwtService)
 
 	// --- Register Routes (like in main.go) ---
@@ -129,10 +152,10 @@ func TestMain(m *testing.M) {
 			}
 		}
 		imageHandler.RegisterRoutes(api, authMW)
-		albumHandler.RegisterRoutes(api, authMW)  // Stubs, but register them
-		tagHandler.RegisterRoutes(api, authMW)    // Stubs
-		shareHandler.RegisterRoutes(api, authMW)  // Stubs
-		searchHandler.RegisterRoutes(api, authMW) // Stubs
+		// albumHandler.RegisterRoutes(api, authMW)  // Stubs, but register them
+		// tagHandler.RegisterRoutes(api, authMW)    // Stubs
+		// shareHandler.RegisterRoutes(api, authMW)  // Stubs
+		// searchHandler.RegisterRoutes(api, authMW) // Stubs
 		api.GET("/me", authMW, func(c *gin.Context) {
 			claims := middleware.GetUserClaims(c)
 			if claims == nil {
@@ -542,4 +565,168 @@ func TestImageUploadValidations(t *testing.T) {
 	})
 
 	// Add test for file size limit if needed (requires creating a larger file)
+}
+func TestAlbumWorkflow(t *testing.T) {
+	clearTables(t) // Ensure clean slate
+
+	// Login first
+	token, userID := performDevLogin(t, "album-test@example.com", "Album Tester")
+	require.NotEmpty(t, token)
+	require.NotZero(t, userID)
+
+	// Variable to store albumID
+	var albumID int64
+
+	// Create a test album
+	t.Run("CreateAlbum", func(t *testing.T) {
+		albumPayload := map[string]string{
+			"name":        "Integration Test Album",
+			"description": "Created during integration testing",
+		}
+		payloadBytes, _ := json.Marshal(albumPayload)
+
+		rr, err := performRequest("POST", "/api/albums", bytes.NewBuffer(payloadBytes), token, "application/json")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusCreated, rr.Code, "Album creation failed with status %d. Body: %s", rr.Code, rr.Body.String())
+
+		var album models.Album
+		err = json.Unmarshal(rr.Body.Bytes(), &album)
+		require.NoError(t, err)
+		assert.Equal(t, "Integration Test Album", album.Name)
+		assert.Equal(t, "Created during integration testing", album.Description)
+		assert.Equal(t, userID, album.UserID)
+		assert.NotZero(t, album.ID)
+
+		// Store album ID for later tests
+		albumID = album.ID
+	})
+
+	// List albums
+	t.Run("ListAlbums", func(t *testing.T) {
+		rr, err := performRequest("GET", "/api/albums", nil, token, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+
+		var albums []models.Album
+		err = json.Unmarshal(rr.Body.Bytes(), &albums)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(albums), 1, "Expected at least one album")
+
+		// Find our test album
+		found := false
+		for _, album := range albums {
+			if album.ID == albumID {
+				found = true
+				assert.Equal(t, "Integration Test Album", album.Name)
+				break
+			}
+		}
+		assert.True(t, found, "Created album not found in the list")
+	})
+
+	// Get specific album
+	t.Run("GetAlbum", func(t *testing.T) {
+		albumIDStr := fmt.Sprintf("%d", albumID)
+		rr, err := performRequest("GET", "/api/albums/"+albumIDStr, nil, token, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+
+		var album models.Album
+		err = json.Unmarshal(rr.Body.Bytes(), &album)
+		require.NoError(t, err)
+		assert.Equal(t, albumID, album.ID)
+		assert.Equal(t, "Integration Test Album", album.Name)
+	})
+
+	// Update album
+	t.Run("UpdateAlbum", func(t *testing.T) {
+		albumIDStr := fmt.Sprintf("%d", albumID)
+		updatePayload := map[string]string{
+			"name":        "Updated Test Album",
+			"description": "This album was updated",
+		}
+		payloadBytes, _ := json.Marshal(updatePayload)
+
+		rr, err := performRequest("PUT", "/api/albums/"+albumIDStr, bytes.NewBuffer(payloadBytes), token, "application/json")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+
+		// Verify the update by fetching the album again
+		rr, err = performRequest("GET", "/api/albums/"+albumIDStr, nil, token, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+
+		var album models.Album
+		err = json.Unmarshal(rr.Body.Bytes(), &album)
+		require.NoError(t, err)
+		assert.Equal(t, "Updated Test Album", album.Name)
+		assert.Equal(t, "This album was updated", album.Description)
+	})
+
+	// Upload an image for album/image tests
+	var imageID string
+	t.Run("UploadImageForAlbum", func(t *testing.T) {
+		dummyImagePath := createDummyFile(t, "album_test_image.jpg", "dummy image content")
+		_, meta := performUpload(t, token, "file", dummyImagePath, "image/jpeg")
+		imageID = meta.ID
+		require.NotEmpty(t, imageID)
+	})
+
+	// Add image to album
+	t.Run("AddImageToAlbum", func(t *testing.T) {
+		albumIDStr := fmt.Sprintf("%d", albumID)
+		addImagePayload := map[string]string{
+			"image_id": imageID,
+		}
+		payloadBytes, _ := json.Marshal(addImagePayload)
+
+		rr, err := performRequest("POST", "/api/albums/"+albumIDStr+"/images", bytes.NewBuffer(payloadBytes), token, "application/json")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+	})
+
+	// List images in album
+	t.Run("ListImagesInAlbum", func(t *testing.T) {
+		albumIDStr := fmt.Sprintf("%d", albumID)
+		rr, err := performRequest("GET", "/api/albums/"+albumIDStr+"/images", nil, token, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+
+		var images []models.ImageMetadata
+		err = json.Unmarshal(rr.Body.Bytes(), &images)
+		require.NoError(t, err)
+		assert.Equal(t, 1, len(images), "Expected exactly one image in album")
+		assert.Equal(t, imageID, images[0].ID)
+	})
+
+	// Remove image from album
+	t.Run("RemoveImageFromAlbum", func(t *testing.T) {
+		albumIDStr := fmt.Sprintf("%d", albumID)
+		rr, err := performRequest("DELETE", "/api/albums/"+albumIDStr+"/images/"+imageID, nil, token, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+
+		// Verify image is removed
+		rr, err = performRequest("GET", "/api/albums/"+albumIDStr+"/images", nil, token, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+
+		var images []models.ImageMetadata
+		err = json.Unmarshal(rr.Body.Bytes(), &images)
+		require.NoError(t, err)
+		assert.Equal(t, 0, len(images), "Expected no images in album after removal")
+	})
+
+	// Delete album
+	t.Run("DeleteAlbum", func(t *testing.T) {
+		albumIDStr := fmt.Sprintf("%d", albumID)
+		rr, err := performRequest("DELETE", "/api/albums/"+albumIDStr, nil, token, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusOK, rr.Code)
+
+		// Verify album is deleted
+		rr, err = performRequest("GET", "/api/albums/"+albumIDStr, nil, token, "")
+		require.NoError(t, err)
+		require.Equal(t, http.StatusNotFound, rr.Code, "Album should be deleted")
+	})
 }

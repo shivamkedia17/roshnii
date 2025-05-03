@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +33,9 @@ type GoogleOAuthService struct {
 
 // NewGoogleOAuthService initializes the Google OAuth service.
 func NewGoogleOAuthService(cfg *config.Config, userStore db.UserStore, jwtService JWTService) *GoogleOAuthService {
-	redirectURL := fmt.Sprintf("http://%s:%s/api/auth/google/callback", cfg.ServerHost, cfg.ServerPort)
+
+	// redirectURL := fmt.Sprintf("http://%s:%s/api/auth/google/callback", cfg.ServerHost, cfg.ServerPort)
+	redirectURL := fmt.Sprintf("http://%s:%s/api/auth/google/callback", cfg.PublicHost, cfg.PublicPort)
 	log.Printf("Using Google OAuth Redirect URL: %s", redirectURL)
 
 	return &GoogleOAuthService{
@@ -71,15 +74,21 @@ func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
 		return
 	}
 
+	secureCookie := s.AppConfig.Environment != "development"
+	sameSiteMode := http.SameSiteNoneMode
+	if !secureCookie {
+		sameSiteMode = http.SameSiteLaxMode
+	}
+
 	// Store the state in a secure, HttpOnly cookie
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     oauthStateCookieName,
 		Value:    state,
 		HttpOnly: true,
-		Secure:   s.AppConfig.Environment != "development", // Use Secure in prod/staging
-		Path:     "/",                                      // Accessible across the domain
-		MaxAge:   int(10 * time.Minute / time.Second),      // 10 minutes validity
-		SameSite: http.SameSiteLaxMode,                     // Good default for OAuth redirects
+		Secure:   secureCookie,                        // Use Secure in prod/staging
+		Path:     "/",                                 // Accessible across the domain
+		MaxAge:   int(10 * time.Minute / time.Second), // 10 minutes validity
+		SameSite: sameSiteMode,                        // Good default for OAuth redirects
 	})
 
 	// Redirect user to Google's consent page
@@ -175,28 +184,48 @@ func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 	log.Printf("------------------------------------------")
 	// --- End Added Logging ---
 
-	// 6. Generate JWT
-	jwtToken, err := s.JWTService.GenerateToken(user)
+	// 6. Generate JWT tokens (access + refresh)
+	accessToken, err := s.JWTService.GenerateToken(user)
 	if err != nil {
-		log.Printf("OAuth Callback Error: Failed to generate JWT: %v", err)
+		log.Printf("OAuth Callback Error: Failed to generate access token: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete login."})
 		return
 	}
 
-	// 7. Set JWT as HttpOnly Cookie (Recommended for web apps)
+	refreshToken, err := s.JWTService.GenerateRefreshToken(user)
+	if err != nil {
+		log.Printf("OAuth Callback Error: Failed to generate refresh token: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete login."})
+		return
+	}
+
+	// 7. Set JWT cookies
+	secureCookie := s.AppConfig.Environment != "development"
+
+	// Set access token cookie
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "auth_token", // Standard name for the auth token cookie
-		Value:    jwtToken,
+		Name:     "auth_token",
+		Value:    accessToken,
 		HttpOnly: true,
-		Secure:   s.AppConfig.Environment != "development",
+		Secure:   secureCookie,
 		Path:     "/",
-		MaxAge:   int(s.AppConfig.TokenDuration / time.Second), // Use configured duration
+		MaxAge:   int(s.AppConfig.TokenDuration / time.Second),
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Set refresh token cookie with longer expiration
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		HttpOnly: true,
+		Secure:   secureCookie,
+		Path:     "/",
+		MaxAge:   int(s.AppConfig.TokenDuration * 7 / time.Second), // 7x longer
 		SameSite: http.SameSiteLaxMode,
 	})
 
 	// --- Added Logging ---
 	log.Printf("OAuth Callback: Set auth_token cookie successfully for user %d.", user.ID)
-	// --- End Added Logging ---
 
 	// 8. Redirect to Frontend
 	log.Printf("OAuth successful for user %s (%d). Redirecting to frontend: %s", user.Email, user.ID, s.AppConfig.FrontendURL)
@@ -241,8 +270,33 @@ func (s *GoogleOAuthService) fetchGoogleUserInfo(token *oauth2.Token) (*models.G
 	return &googleUser, nil
 }
 
-// HandleLogout clears the authentication cookie.
+// HandleLogout clears the authentication cookies and blacklists the token.
 func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
+	// Get current tokens before deleting cookies
+	accessToken, _ := c.Cookie("auth_token")
+	refreshToken, _ := c.Cookie("refresh_token")
+
+	// If no cookie token, try header (for dev mode)
+	if accessToken == "" {
+		authHeader := c.GetHeader("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			accessToken = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
+	// Blacklist tokens if they exist
+	if accessToken != "" {
+		if err := s.JWTService.BlacklistToken(accessToken); err != nil {
+			log.Printf("Warning: Failed to blacklist access token: %v", err)
+		}
+	}
+
+	if refreshToken != "" {
+		if err := s.JWTService.BlacklistToken(refreshToken); err != nil {
+			log.Printf("Warning: Failed to blacklist refresh token: %v", err)
+		}
+	}
+
 	// Clear the auth_token cookie
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "auth_token",
@@ -254,6 +308,89 @@ func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	log.Printf("User logged out.")
+	// Clear the refresh_token cookie
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1, // Delete cookie now
+		HttpOnly: true,
+		Secure:   s.AppConfig.Environment != "development",
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	log.Printf("User logged out successfully.")
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
+}
+
+// HandleRefreshToken processes token refresh requests
+func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
+	// Get refresh token from cookie
+	refreshToken, err := c.Cookie("refresh_token")
+	if err != nil {
+		// If no cookie, try getting from Authorization header (for dev/testing)
+		authHeader := c.GetHeader("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			refreshToken = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
+	if refreshToken == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token not provided"})
+		return
+	}
+
+	// Validate refresh token
+	claims, err := s.JWTService.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		log.Printf("Refresh token validation failed: %v", err)
+
+		// Clear the invalid refresh token cookie
+		http.SetCookie(c.Writer, &http.Cookie{
+			Name:     "refresh_token",
+			Value:    "",
+			Path:     "/",
+			MaxAge:   -1,
+			HttpOnly: true,
+			Secure:   s.AppConfig.Environment != "development",
+			SameSite: http.SameSiteLaxMode,
+		})
+
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired refresh token"})
+		return
+	}
+
+	// Get the user from database to ensure it still exists
+	ctx := c.Request.Context()
+	user, err := s.UserStore.GetUserByID(ctx, claims.UserID)
+	if err != nil {
+		log.Printf("Error fetching user during token refresh: %v", err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Generate new access token
+	newAccessToken, err := s.JWTService.GenerateToken(user)
+	if err != nil {
+		log.Printf("Failed to generate new access token: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate access token"})
+		return
+	}
+
+	// Set the new access token cookie
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     "auth_token",
+		Value:    newAccessToken,
+		HttpOnly: true,
+		Secure:   s.AppConfig.Environment != "development",
+		Path:     "/",
+		MaxAge:   int(s.AppConfig.TokenDuration / time.Second),
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Return success
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Token refreshed successfully",
+		"token":   newAccessToken, // Include in response for dev mode
+	})
 }

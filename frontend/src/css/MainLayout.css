@@ -15,9 +15,15 @@
 .main-content {
     flex: 1;
     overflow: auto;
-    padding: 20px;
     transition: margin-left 0.3s ease;
 }
+
+/* .main-content > div {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    justify-content: center;
+} */
 
 @media (max-width: 768px) {
     .sidebar {

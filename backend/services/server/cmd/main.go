@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-contrib/cors" // Import CORS middleware
 	"github.com/gin-gonic/gin"
@@ -13,11 +14,14 @@ import (
 	"github.com/shivamkedia17/roshnii/services/server/internal/middleware"
 	"github.com/shivamkedia17/roshnii/shared/pkg/config"
 	"github.com/shivamkedia17/roshnii/shared/pkg/db"
+
+	"github.com/shivamkedia17/roshnii/shared/pkg/storage" // Add this import
 )
 
 func main() {
 	// 1. Load Configuration
-	cfg, err := config.LoadConfig(".") // Load from current directory (where server runs) or use "../.." for project root
+	// Load from current directory (where server runs) or use "../.." for project root
+	cfg, err := config.LoadConfig("../..")
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
@@ -29,22 +33,36 @@ func main() {
 	}
 	defer database.Close()
 
-	// 3. Initialize Blob Storage (Placeholder)
-	// storageService, err := storage.NewBlobStorage(cfg) // Implement this based on config.BlobStorageType
-	// if err != nil {
-	// 	log.Fatalf("Failed to initialize blob storage: %v", err)
-	// }
+	// 3. Initialize Blob Storage
+	var storageService storage.BlobStorage
+	if cfg.BlobStorageType == "local" {
+		localStoragePath := cfg.LocalstoragePath
+		if localStoragePath == "" {
+			localStoragePath = "./uploads" // Default path
+		}
+
+		var err error
+		storageService, err = storage.NewLocalStorage(localStoragePath)
+		if err != nil {
+			log.Fatalf("Failed to initialize local storage: %v", err)
+		}
+		log.Printf("Using local file storage at: %s", localStoragePath)
+	} else {
+		// For now, fall back to local storage if type is unrecognized
+		log.Printf("Unrecognized storage type '%s', using local storage", cfg.BlobStorageType)
+		storageService, _ = storage.NewLocalStorage("./uploads")
+	}
 
 	// 4. Initialize Services
-	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.TokenDuration)
+	jwtService := auth.NewJWTService(cfg.JWTSecret, cfg.JWTRefreshSecret, cfg.TokenDuration)
 	googleOAuthService := auth.NewGoogleOAuthService(cfg, database, jwtService)
 
 	// 5. Initialize Handlers
-	imageHandler := handlers.NewImageHandler(database /*storageService,*/, cfg)
+	imageHandler := handlers.NewImageHandler(database, storageService, cfg)
 	albumHandler := handlers.NewAlbumHandler(database, cfg)
-	tagHandler := handlers.NewTagHandler(database, cfg)
-	shareHandler := handlers.NewShareHandler(database, cfg)
-	searchHandler := handlers.NewSearchHandler(database, cfg)
+
+	// TODO IMP
+	// searchHandler := handlers.NewSearchHandler(database, cfg)
 
 	// 6. Setup Gin Engine
 	if cfg.Environment == "production" {
@@ -57,7 +75,9 @@ func main() {
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOrigins = []string{cfg.FrontendURL, "http://localhost:8080"} // Add server origin if needed, or be more specific
 	corsConfig.AllowCredentials = true
-	corsConfig.AddAllowHeaders("Authorization") // Ensure Authorization header is allowed
+	// Ensure Authorization header is allowed
+	corsConfig.AddAllowHeaders("Authorization")
+
 	router.Use(cors.New(corsConfig))
 
 	// Custom Auth Middleware
@@ -72,13 +92,14 @@ func main() {
 	api := router.Group("/api")
 	{
 		// --- Authentication Routes ---
-		authRoutes := api.Group("/auth") // Group under /auth
+		authRoutes := api.Group("/auth")
 		{
 			googleRoutes := authRoutes.Group("/google")
 			{
 				googleRoutes.GET("/login", googleOAuthService.HandleLogin)
 				googleRoutes.GET("/callback", googleOAuthService.HandleCallback)
 				googleRoutes.POST("/logout", authMW, googleOAuthService.HandleLogout) // Apply auth middleware here
+				googleRoutes.POST("/refresh", googleOAuthService.HandleRefreshToken)
 			}
 
 			// --- Development Only Login ---
@@ -108,29 +129,65 @@ func main() {
 							return
 						}
 
-						// Generate JWT
-						token, err := jwtService.GenerateToken(user)
+						// Generate JWT tokens
+						accessToken, err := jwtService.GenerateToken(user)
 						if err != nil {
-							log.Printf("Dev Login Error: Failed to generate JWT for user %d: %v", user.ID, err)
+							log.Printf("Dev Login Error: Failed to generate access token for user %d: %v", user.ID, err)
 							c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate session"})
 							return
 						}
 
-						log.Printf("Dev Login Success: Generated token for user %s (ID: %d)", user.Email, user.ID)
-						c.JSON(http.StatusOK, gin.H{"token": token})
+						refreshToken, err := jwtService.GenerateRefreshToken(user)
+						if err != nil {
+							log.Printf("Dev Login Error: Failed to generate refresh token for user %d: %v", user.ID, err)
+							c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate session"})
+							return
+						}
+
+						// Set cookies
+						cookieSecure := cfg.Environment != "development"
+
+						http.SetCookie(c.Writer, &http.Cookie{
+							Name:     "auth_token",
+							Value:    accessToken,
+							HttpOnly: true,
+							Secure:   cookieSecure,
+							Path:     "/",
+							MaxAge:   int(cfg.TokenDuration / time.Second),
+							SameSite: http.SameSiteLaxMode,
+						})
+
+						http.SetCookie(c.Writer, &http.Cookie{
+							Name:     "refresh_token",
+							Value:    refreshToken,
+							HttpOnly: true,
+							Secure:   cookieSecure,
+							Path:     "/",
+							MaxAge:   int(cfg.TokenDuration * 7 / time.Second),
+							SameSite: http.SameSiteLaxMode,
+						})
+
+						log.Printf("Dev Login Success: Generated tokens for user %s (ID: %d)", user.Email, user.ID)
+						c.JSON(http.StatusOK, gin.H{
+							"token":         accessToken,  // For dev clients directly using the token
+							"refresh_token": refreshToken, // For dev testing
+							"expires_in":    int(cfg.TokenDuration / time.Second),
+							"user_id":       user.ID,
+							"email":         user.Email,
+						})
 					})
 				}
-			} else {
-				log.Println("INFO: Development login endpoint is disabled in non-development environments.")
 			}
-		} // End /auth group
+		}
+
+		// End /auth group
 
 		// --- Image Routes (already includes auth middleware via RegisterRoutes) ---
 		imageHandler.RegisterRoutes(api, authMW)
 		albumHandler.RegisterRoutes(api, authMW)
-		tagHandler.RegisterRoutes(api, authMW)
-		shareHandler.RegisterRoutes(api, authMW)
-		searchHandler.RegisterRoutes(api, authMW)
+
+		// TODO
+		// searchHandler.RegisterRoutes(api, authMW)
 
 		// --- User Info Route (Example) ---
 		api.GET("/me", authMW, func(c *gin.Context) {

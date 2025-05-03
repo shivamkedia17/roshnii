@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "./common/ErrorBoundary";
 import { useAuth } from "../context/AuthContext";
 import { Login } from "./auth/Login";
 import { MainLayout } from "./layout/MainLayout";
@@ -10,5 +11,9 @@ export default function App() {
     return <div className="loading">Loading...</div>;
   }
 
-  return <>{isAuthenticated ? <MainLayout /> : <Login />}</>;
+  return (
+    <ErrorBoundary>
+      {isAuthenticated ? <MainLayout /> : <Login />}
+    </ErrorBoundary>
+  );
 }

@@ -47,11 +47,12 @@ type GoogleUser struct {
 
 // Album represents a collection of images grouped by a user.
 type Album struct {
-	ID        int64     `json:"id" db:"id"`
-	UserID    UserID    `json:"user_id" db:"user_id"`
-	Name      string    `json:"name" db:"name"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	ID          int64     `json:"id" db:"id"`
+	UserID      UserID    `json:"user_id" db:"user_id"`
+	Name        string    `json:"name" db:"name"`
+	Description string    `json:"description" db:"description"` // Add this line
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // AlbumImage links images to albums (many-to-many).

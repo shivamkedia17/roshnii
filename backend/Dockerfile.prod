@@ -1,0 +1,31 @@
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /build
+
+# Copy go.mod and go.sum first to leverage Docker cache
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the rest of the source code
+COPY . .
+
+# Build the application with production optimization flags
+WORKDIR /build/services/server/cmd
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /server_app .
+
+# --- Final Stage ---
+FROM alpine:latest
+
+# Add CA certificates for HTTPS requests
+RUN apk --no-cache add ca-certificates && update-ca-certificates
+
+WORKDIR /app
+
+# Copy binary from builder stage
+COPY --from=builder /server_app .
+
+# Expose the API port
+EXPOSE 8080
+
+# Run with production-specific parameters
+CMD ["./server_app"]

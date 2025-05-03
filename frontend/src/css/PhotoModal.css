@@ -1,0 +1,295 @@
+.photo-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.photo-modal {
+    background-color: var(--background-color, #fff);
+    border-radius: 10px;
+    max-width: 90%;
+    max-height: 90%;
+    width: 1000px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+    animation: modal-appear 0.3s ease;
+}
+
+@keyframes modal-appear {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--padding-m) var(--padding-l);
+    border-bottom: 1px solid var(--border-color, #eee);
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--text-color, #333);
+    font-weight: 600;
+    /* Limit header text length */
+    max-width: 80%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.8rem;
+    color: var(--text-color-secondary, #666);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: color 0.2s ease;
+}
+
+.close-button:hover {
+    color: var(--text-color, #333);
+}
+
+.modal-body {
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    flex: 1;
+}
+
+.photo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: var(--padding-l);
+    max-height: 70vh;
+    overflow: hidden;
+}
+
+.full-size-photo {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.photo-details {
+    padding: 0 var(--padding-l) var(--padding-l);
+    background-color: var(--background-color-light, #f9f9f9);
+    border-top: 1px solid var(--border-color, #eee);
+}
+
+.detail-row {
+    display: flex;
+    margin: var(--margin-s) 0;
+    font-size: 0.9rem;
+}
+
+.detail-label {
+    font-weight: 600;
+    width: 100px;
+    color: var(--text-color-secondary, #666);
+}
+
+.detail-value {
+    flex: 1;
+    color: var(--text-color, #333);
+}
+
+.modal-footer {
+    padding: var(--padding-m) var(--padding-l);
+    border-top: 1px solid var(--border-color, #eee);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.delete-button {
+    background-color: var(--error-color, #e53935);
+    color: white;
+    border: none;
+    padding: var(--padding-s) var(--padding-l);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.delete-button:hover:not(:disabled) {
+    background-color: var(--error-color-hover, #c62828);
+}
+
+.delete-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Delete confirmation dialog */
+.delete-confirm-dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: var(--background-color, #fff);
+    padding: var(--padding-l);
+    border-radius: 8px;
+    width: 350px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+    z-index: 1010;
+    animation: dialog-appear 0.2s ease;
+}
+
+@keyframes dialog-appear {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -60%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+.delete-confirm-dialog h4 {
+    margin-top: 0;
+    color: var(--text-color, #333);
+}
+
+.delete-confirm-dialog p {
+    color: var(--text-color-secondary, #666);
+    margin-bottom: var(--margin-l);
+}
+
+.confirm-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--padding-m);
+}
+
+.cancel-button {
+    background-color: var(--background-color-secondary, #e0e0e0);
+    color: var(--text-color, #333);
+    border: none;
+    padding: var(--padding-s) var(--padding-l);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.confirm-delete-button {
+    background-color: var(--error-color, #e53935);
+    color: white;
+    border: none;
+    padding: var(--padding-s) var(--padding-l);
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.confirm-delete-button:hover:not(:disabled) {
+    background-color: var(--error-color-hover, #c62828);
+}
+
+.confirm-delete-button:disabled,
+.cancel-button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* Loading and error states */
+.photo-modal.loading,
+.photo-modal.error {
+    padding: var(--padding-xl);
+    text-align: center;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.photo-modal.error {
+    color: var(--error-color, #e53935);
+}
+
+/* For smaller screens */
+@media (max-width: 768px) {
+    .photo-modal {
+        width: 95%;
+        max-height: 95%;
+    }
+
+    .photo-container {
+        max-height: 50vh;
+    }
+
+    .detail-row {
+        flex-direction: column;
+    }
+
+    .detail-label {
+        width: 100%;
+        margin-bottom: var(--margin-xs);
+    }
+
+    .delete-confirm-dialog {
+        width: 90%;
+        max-width: 350px;
+    }
+}
+
+.add-to-album-button {
+    background-color: var(--primary-color-light, #e3f2fd);
+    color: var(--primary-color, #3498db);
+    border: none;
+    padding: var(--padding-s) var(--padding-l);
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: var(--margin-s);
+    transition: background-color 0.2s ease;
+}
+
+.add-to-album-button:hover:not(:disabled) {
+    background-color: var(--primary-color, #3498db);
+    color: white;
+}
+
+.remove-from-album-button {
+    background-color: var(--background-color-secondary, #f0f0f0);
+    color: var(--text-color-secondary, #666);
+    border: none;
+    padding: var(--padding-s) var(--padding-l);
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: var(--margin-s);
+    transition: all 0.2s ease;
+}
+
+.remove-from-album-button:hover:not(:disabled) {
+    background-color: var(--error-color-light, #ffebee);
+    color: var(--error-color, #e53935);
+}
+
+/* Update the modal-footer to handle multiple buttons */
+.modal-footer {
+    padding: var(--padding-m) var(--padding-l);
+    border-top: 1px solid var(--border-color, #eee);
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: var(--padding-s);
+}

@@ -44,13 +44,34 @@ func AuthMiddleware(jwtService auth.JWTService) gin.HandlerFunc {
 			return
 		}
 
-		// 2. Validate the token
+		// Validate the token
 		claims, err := jwtService.ValidateToken(tokenString)
 		if err != nil {
+			errorMessage := "Invalid or expired token"
+			statusCode := http.StatusUnauthorized
+
+			// More specific error messages based on the error
+			if strings.Contains(err.Error(), "token is blacklisted") {
+				errorMessage = "Session has been invalidated, please log in again"
+			} else if strings.Contains(err.Error(), "expired") {
+				errorMessage = "Session expired, please refresh your token or log in again"
+				statusCode = http.StatusUnauthorized
+			} else if strings.Contains(err.Error(), "invalid token") {
+				errorMessage = "Invalid authentication token"
+			}
+
 			log.Printf("Token validation failed: %v", err)
+
 			// Clear potentially invalid cookie
-			http.SetCookie(c.Writer, &http.Cookie{Name: "auth_token", Value: "", Path: "/", MaxAge: -1})
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
+			http.SetCookie(c.Writer, &http.Cookie{
+				Name:     "auth_token",
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+			})
+
+			c.AbortWithStatusJSON(statusCode, gin.H{"error": errorMessage})
 			return
 		}
 

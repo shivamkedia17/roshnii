@@ -4,7 +4,7 @@
     padding: var(--padding-s);
 
     justify-content: space-around;
-    /* align-items: center; */
+    align-items: center;
 }
 
 .header-left {
@@ -12,7 +12,7 @@
 
 .header-center {
     flex-grow: 1;
-    margin-block-start: var(--margin-xxl);
+    margin-block-start: var(--margin-xl);
     margin-block-end: var(--margin-m);
 }
 
@@ -60,13 +60,12 @@
     border-radius: var(--border-radius);
     padding-block: var(--padding-s);
     padding-inline: var(--padding-l);
-    margin-block: var(--margin-l);
-    font-weight: normal;
+    font-weight: 500;
     transition: font-weight 0.3s ease;
 }
 
 .search-bar:focus-within {
     outline: none;
     border-color: var(--border-color-focused);
-    font-weight: bold;
+    font-weight: 600;
 }
