@@ -53,29 +53,26 @@ export function useUploadPhoto() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (formData: FormData) => {
-      // Make sure we're using the correct API endpoint
-      const token = localStorage.getItem("auth_token");
-      const headers: HeadersInit = {};
+    mutationFn: async (formData: FormData) => {
+      try {
+        const response = await fetch(`/api/upload`, {
+          method: "POST",
+          credentials: "include", // Use cookies for authentication
+          body: formData, // Don't set Content-Type header with FormData
+        });
 
-      // Add Authorization header if token exists (for dev mode)
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      return fetch(`/api/upload`, {
-        method: "POST",
-        credentials: "include", // For cookies
-        headers,
-        body: formData, // Don't set Content-Type header with FormData
-      }).then((res) => {
-        if (!res.ok) {
-          return res.json().then((err) => {
-            throw new Error(err.error || `Upload failed: ${res.status}`);
-          });
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(
+            errorData.error || `Upload failed: ${response.status}`,
+          );
         }
-        return res.json();
-      });
+
+        return await response.json();
+      } catch (error) {
+        console.error("Photo upload failed:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       // Invalidate and refetch photos list when photo is uploaded
@@ -89,35 +86,33 @@ export function useDeletePhoto() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (photoId: string) => {
-      const token = localStorage.getItem("auth_token");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
+    mutationFn: async (photoId: string) => {
+      try {
+        const response = await fetch(`/api/image/${photoId}`, {
+          method: "DELETE",
+          credentials: "include", // Use cookies for authentication
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
 
-      // Add Authorization header if token exists
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      return fetch(`/api/image/${photoId}`, {
-        method: "DELETE",
-        credentials: "include", // For cookies
-        headers,
-      }).then((res) => {
-        if (!res.ok) {
-          return res
-            .json()
-            .then((err) => {
-              throw new Error(err.error || `Delete failed: ${res.status}`);
-            })
-            .catch(() => {
-              // If JSON parsing fails
-              throw new Error(`Failed to delete photo: ${res.status}`);
-            });
+        if (!response.ok) {
+          try {
+            const errorData = await response.json();
+            throw new Error(
+              errorData.error || `Delete failed: ${response.status}`,
+            );
+          } catch (jsonError) {
+            // If JSON parsing fails
+            throw new Error(`Failed to delete photo: ${response.status}`);
+          }
         }
-        return res.json();
-      });
+
+        return await response.json();
+      } catch (error) {
+        console.error("Photo deletion failed:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       // Invalidate and refetch photos list when a photo is deleted

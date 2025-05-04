@@ -203,6 +203,16 @@ form button[type="submit"] {
     background-color: var(--primary-color-hover, #2980b9);
 }
 
+.dev-warning {
+    background-color: #ff6b6b;
+    color: white;
+    padding: 8px;
+    text-align: center;
+    font-weight: bold;
+    border-radius: 4px;
+    margin-bottom: 16px;
+}
+
 @keyframes spin {
     to {
         transform: rotate(360deg);

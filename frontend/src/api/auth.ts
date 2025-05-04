@@ -1,27 +1,37 @@
 import { apiClient, API_URL } from "./api";
 import { UserInfo } from "@/types";
-import { AuthTokens } from "@/types";
+
+// Environment detection
+const isDevelopment =
+  import.meta.env.DEV ||
+  window.location.hostname === "localhost" ||
+  window.location.hostname === "127.0.0.1";
 
 export const authAPI = {
-  login: () => (window.location.href = "/api/auth/google/login"),
+  // Redirect to OAuth login
+  login: () => {
+    window.location.href = "/api/auth/google/login";
+  },
 
-  // Enhanced logout with return value
+  // Simple logout that relies on backend to clear cookies
   logout: async (): Promise<void> => {
     try {
-      await apiClient("/auth/google/logout", { method: "POST" });
-      // Clear any local storage items
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("refresh_token");
+      await fetch("/api/auth/google/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Cache-Control": "no-cache, no-store",
+          Pragma: "no-cache",
+        },
+      });
     } catch (error) {
       console.error("Logout error:", error);
-      // Still clear local storage even if API call fails
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("refresh_token");
-      throw error;
+      // Don't throw here, just log the error
+      // This makes the logout more fault-tolerant
     }
   },
 
-  // Get current user with better error handling
+  // Get current user
   getCurrentUser: async (): Promise<UserInfo> => {
     try {
       return await apiClient<UserInfo>("/me");
@@ -31,62 +41,35 @@ export const authAPI = {
     }
   },
 
-  // New refresh token function
-  refreshToken: async (): Promise<AuthTokens> => {
+  // Refresh token - just calls the endpoint, backend handles cookie updates
+  refreshToken: async (): Promise<{ message: string }> => {
     try {
-      // Use the refresh_token cookie or token from localStorage
-      const refreshToken = localStorage.getItem("refresh_token");
-      const headers: HeadersInit = {};
-
-      if (refreshToken) {
-        headers["Authorization"] = `Bearer ${refreshToken}`;
-      }
-
-      const response = await fetch(`${API_URL}/auth/google/refresh`, {
+      return await apiClient<{ message: string }>("/auth/google/refresh", {
         method: "POST",
-        credentials: "include", // For cookies
-        headers,
+        credentials: "include",
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `Refresh failed: ${response.status}`,
-        );
-      }
-
-      const data = await response.json();
-
-      // In dev mode, the API returns tokens in the response
-      // Store them in localStorage as fallback
-      if (data.token) {
-        localStorage.setItem("auth_token", data.token);
-      }
-      if (data.refresh_token) {
-        localStorage.setItem("refresh_token", data.refresh_token);
-      }
-
-      return {
-        token: data.token || "",
-        refreshToken: data.refresh_token,
-        expiresIn: data.expires_in,
-      };
     } catch (error) {
       console.error("Token refresh error:", error);
       throw error;
     }
   },
 
-  // Dev login with token storage
+  // Development-only login feature
+  // This should ONLY be available in development mode
   devLogin: async (credentials: {
     email: string;
     name: string;
-  }): Promise<AuthTokens> => {
+  }): Promise<void> => {
+    if (!isDevelopment) {
+      console.error("Dev login is only available in development mode");
+      throw new Error("Dev login not available");
+    }
+
     const response = await fetch(`${API_URL}/auth/dev/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(credentials),
-      credentials: "include", // For cookies
+      credentials: "include", // Still use cookies even for dev login
     });
 
     if (!response.ok) {
@@ -94,20 +77,6 @@ export const authAPI = {
       throw new Error(errorData.error || `Login failed: ${response.status}`);
     }
 
-    const data = await response.json();
-
-    // Store tokens in localStorage for dev mode
-    if (data.token) {
-      localStorage.setItem("auth_token", data.token);
-    }
-    if (data.refresh_token) {
-      localStorage.setItem("refresh_token", data.refresh_token);
-    }
-
-    return {
-      token: data.token || "",
-      refreshToken: data.refresh_token,
-      expiresIn: data.expires_in,
-    };
+    return response.json();
   },
 };

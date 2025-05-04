@@ -8,32 +8,29 @@ export const photosAPI = {
   getPhoto: (id: string) => apiClient<any>(`/image/${id}`),
 
   // Upload a new photo
-  uploadPhoto: (formData: FormData) => {
-    const token = localStorage.getItem("auth_token");
-    const headers: HeadersInit = {};
+  uploadPhoto: async (formData: FormData) => {
+    // No longer use localStorage tokens - rely only on cookies
+    try {
+      const res = await fetch(`${API_URL}/upload`, {
+        method: "POST",
+        credentials: "include", // This ensures cookies are sent with the request
+        // Don't set Content-Type with FormData - browser sets it with boundary
+        body: formData,
+      });
 
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    return fetch(`${API_URL}/upload`, {
-      method: "POST",
-      credentials: "include",
-      headers,
-      body: formData,
-    }).then((res) => {
       if (!res.ok) {
-        return res
-          .json()
-          .then((err) => {
-            throw new Error(err.error || `Upload failed: ${res.status}`);
-          })
-          .catch(() => {
-            throw new Error(`Upload failed: ${res.status}`);
-          });
+        try {
+          const err = await res.json();
+          throw new Error(err.error || `Upload failed: ${res.status}`);
+        } catch {
+          throw new Error(`Upload failed: ${res.status}`);
+        }
       }
-      return res.json();
-    });
+
+      return await res.json();
+    } catch (error) {
+      throw error;
+    }
   },
 
   // Delete a photo

@@ -10,27 +10,39 @@ export function LogoutPage() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    let isMounted = true;
+
     const performLogout = async () => {
       try {
         await logout();
-        setStatus("success");
+        if (isMounted) {
+          setStatus("success");
+        }
 
         // After a successful logout, redirect to login page after a short delay
         setTimeout(() => {
-          window.location.reload(); // Force reload to clear any state
+          // Use direct assignment to location.href rather than reload
+          window.location.href = "/";
         }, 1500);
       } catch (error) {
         console.error("Logout failed:", error);
-        setStatus("error");
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Failed to log out. Please try again.",
-        );
+        if (isMounted) {
+          setStatus("error");
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Failed to log out. Please try again.",
+          );
+        }
       }
     };
 
     performLogout();
+
+    // Cleanup function to handle component unmounting
+    return () => {
+      isMounted = false;
+    };
   }, [logout]);
 
   return (
@@ -59,9 +71,9 @@ export function LogoutPage() {
             <p className="error-message">{errorMessage}</p>
             <button
               className="retry-button"
-              onClick={() => window.location.reload()}
+              onClick={() => (window.location.href = "/")}
             >
-              Try Again
+              Return to Login
             </button>
           </>
         )}

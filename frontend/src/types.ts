@@ -1,6 +1,8 @@
 export type AuthTokens = {
-  token: string;
-  refreshToken?: string;
+  // Simplify to focus on cookie-based auth response
+  message: string;
+  // Only used in development mode
+  token?: string;
   expiresIn?: number;
 };
 
@@ -9,7 +11,7 @@ export type AuthContextType = {
   isLoading: boolean;
   user: UserInfo | null;
   login: () => void;
-  logout: () => Promise<boolean>;
+  logout: () => Promise<boolean | void>;
   refreshToken: () => Promise<boolean>;
 };
 
@@ -75,6 +77,10 @@ export type SidebarProps = {
 export type PhotoModalProps = {
   photoId: string;
   onClose: () => void;
+  albumContext?: {
+    albumId: number;
+    onRemoveFromAlbum: (photoId: string) => void;
+  };
 };
 
 export type UploadFormProps = {

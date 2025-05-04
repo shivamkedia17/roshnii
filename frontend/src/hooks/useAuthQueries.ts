@@ -1,11 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authAPI } from "@/api/auth";
 
-// Query keys
+// Query keys - exported so they can be used elsewhere
 export const authKeys = {
   all: ["auth"] as const,
   currentUser: () => [...authKeys.all, "currentUser"] as const,
-  tokens: () => [...authKeys.all, "tokens"] as const,
 };
 
 // Get current user hook with improved error handling
@@ -52,22 +51,31 @@ export function useRefreshToken() {
   });
 }
 
-// Logout hook with automatic cache clearing
+// Logout hook
 export function useLogout() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: authAPI.logout,
+    mutationFn: async () => {
+      try {
+        // Reset auth state immediately to prevent hooks from trying to refresh
+        queryClient.setQueryData(authKeys.currentUser(), null);
+
+        // Then perform the actual logout request
+        await authAPI.logout();
+        return true;
+      } catch (error) {
+        console.error("Logout API error:", error);
+        // Even if the API call fails, still consider the user logged out locally
+        return false;
+      }
+    },
     onSuccess: () => {
       // Reset auth state
       queryClient.setQueryData(authKeys.currentUser(), null);
 
       // Invalidate all queries to clear cache
       queryClient.invalidateQueries();
-
-      // Clear token data
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("refresh_token");
     },
   });
 }

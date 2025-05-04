@@ -7,10 +7,12 @@ import {
 } from "react";
 import {
   useCurrentUser,
-  useLogout,
   useRefreshToken,
+  useLogout,
+  authKeys,
 } from "@/hooks/useAuthQueries";
 import { AuthContextType, UserInfo } from "@/types";
+import { useQueryClient } from "@tanstack/react-query";
 
 export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
@@ -23,20 +25,43 @@ export const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: user, isLoading, error: userError, isError } = useCurrentUser();
-
-  const logoutMutation = useLogout();
   const refreshMutation = useRefreshToken();
+  const logoutMutation = useLogout();
+  const queryClient = useQueryClient();
 
   // Function to refresh token
   const refreshToken = useCallback(async (): Promise<boolean> => {
     try {
+      // Don't attempt refresh if we've explicitly logged out
+      if (
+        isError &&
+        userError instanceof Error &&
+        userError.message.includes("logged out")
+      ) {
+        return false;
+      }
+
       await refreshMutation.mutateAsync();
       return true;
     } catch (error) {
       console.error("Token refresh error:", error);
       return false;
     }
-  }, [refreshMutation]);
+  }, [refreshMutation, isError, userError]);
+
+  // Listen for session expired events
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      refreshToken().catch((err) => {
+        console.error("Auto-refresh failed:", err);
+      });
+    };
+
+    window.addEventListener("auth:sessionExpired", handleSessionExpired);
+    return () => {
+      window.removeEventListener("auth:sessionExpired", handleSessionExpired);
+    };
+  }, [refreshToken]);
 
   // Setup automatic refresh
   useEffect(() => {
@@ -60,13 +85,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Function to handle logout
   const logout = useCallback(async () => {
     try {
-      await logoutMutation.mutateAsync();
-      return true;
+      // First set authentication state to logged out to prevent refresh attempts
+      // This prevents the infinite loop
+      queryClient.setQueryData(authKeys.currentUser(), null);
+
+      // Then perform the actual logout API call
+      return await logoutMutation.mutateAsync();
     } catch (error) {
       console.error("Logout error:", error);
       return false;
     }
-  }, [logoutMutation]);
+  }, [queryClient, logoutMutation]);
 
   // Determine authentication status
   const isAuthenticated = !!user && !isError;
