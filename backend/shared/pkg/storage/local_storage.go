@@ -11,6 +11,8 @@ import (
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
 )
 
+const defaultPath = "./uploads"
+
 // LocalStorage implements BlobStorage using the local filesystem
 type LocalStorage struct {
 	BasePath string
@@ -18,6 +20,10 @@ type LocalStorage struct {
 
 // NewLocalStorage creates a new LocalStorage instance
 func NewLocalStorage(basePath string) (*LocalStorage, error) {
+	if basePath == "" {
+		basePath = defaultPath
+	}
+
 	// Ensure the base directory exists
 	if err := os.MkdirAll(basePath, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create storage directory: %w", err)

@@ -12,28 +12,15 @@ import (
 
 // AlbumHandler handles album-related API requests.
 type AlbumHandler struct {
-	Store     db.AlbumStore
-	AppConfig *config.Config
+	Config *config.Config
+	DB     db.AlbumStore
 }
 
 // NewAlbumHandler creates a new AlbumHandler
-func NewAlbumHandler(store db.AlbumStore, cfg *config.Config) *AlbumHandler {
-	return &AlbumHandler{Store: store, AppConfig: cfg}
-}
-
-// RegisterRoutes connects album routes to the Gin engine.
-func (h *AlbumHandler) RegisterRoutes(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	albumRoutes := router.Group("/albums")
-	albumRoutes.Use(authMiddleware)
-	{
-		albumRoutes.POST("", h.CreateAlbum)
-		albumRoutes.GET("", h.ListAlbums)
-		albumRoutes.GET("/:id", h.GetAlbum)
-		albumRoutes.PUT("/:id", h.UpdateAlbum)
-		albumRoutes.DELETE("/:id", h.DeleteAlbum)
-		albumRoutes.POST("/:id/images", h.AddImageToAlbum)
-		albumRoutes.DELETE("/:id/images/:image_id", h.RemoveImageFromAlbum)
-		albumRoutes.GET("/:id/images", h.ListAlbumImages)
+func NewAlbumHandler(config *config.Config, db db.AlbumStore) *AlbumHandler {
+	return &AlbumHandler{
+		Config: config,
+		DB:     db,
 	}
 }
 
@@ -56,7 +43,7 @@ func (h *AlbumHandler) CreateAlbum(c *gin.Context) {
 		return
 	}
 
-	album, err := h.Store.CreateAlbum(c.Request.Context(), userID, req.Name, req.Description)
+	album, err := h.DB.CreateAlbum(c.Request.Context(), userID, req.Name, req.Description)
 	if err != nil {
 		log.Printf("Error creating album: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create album"})
@@ -74,7 +61,7 @@ func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 		return
 	}
 
-	albums, err := h.Store.ListAlbumsByUserID(c.Request.Context(), userID)
+	albums, err := h.DB.ListAlbumsByUserID(c.Request.Context(), userID)
 	if err != nil {
 		log.Printf("Error listing albums for user %s: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve albums: " + err.Error()})
@@ -95,7 +82,7 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 
 	// Parse album ID from URL
 	albumID := c.Param("id")
-	album, err := h.Store.GetAlbumByID(c.Request.Context(), userID, albumID)
+	album, err := h.DB.GetAlbumByID(c.Request.Context(), userID, albumID)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -131,7 +118,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		return
 	}
 
-	err := h.Store.UpdateAlbum(c.Request.Context(), userID, albumID, req.Name, req.Description)
+	err := h.DB.UpdateAlbum(c.Request.Context(), userID, albumID, req.Name, req.Description)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -156,7 +143,7 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 	// Parse album ID from URL
 	albumID := c.Param("id")
 
-	err := h.Store.DeleteAlbum(c.Request.Context(), userID, albumID)
+	err := h.DB.DeleteAlbum(c.Request.Context(), userID, albumID)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -191,7 +178,7 @@ func (h *AlbumHandler) AddImageToAlbum(c *gin.Context) {
 		return
 	}
 
-	err := h.Store.AddImageToAlbum(c.Request.Context(), userID, albumID, req.ImageID)
+	err := h.DB.AddImageToAlbum(c.Request.Context(), userID, albumID, req.ImageID)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -226,7 +213,7 @@ func (h *AlbumHandler) RemoveImageFromAlbum(c *gin.Context) {
 		return
 	}
 
-	err := h.Store.RemoveImageFromAlbum(c.Request.Context(), userID, albumID, imageID)
+	err := h.DB.RemoveImageFromAlbum(c.Request.Context(), userID, albumID, imageID)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -254,7 +241,7 @@ func (h *AlbumHandler) ListAlbumImages(c *gin.Context) {
 
 	albumID := c.Param("id")
 
-	images, err := h.Store.ListImagesInAlbum(c.Request.Context(), userID, albumID)
+	images, err := h.DB.ListImagesInAlbum(c.Request.Context(), userID, albumID)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})

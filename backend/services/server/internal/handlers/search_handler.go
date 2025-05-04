@@ -17,13 +17,4 @@ func NewSearchHandler(store db.Store, cfg *config.Config) *SearchHandler {
 	return &SearchHandler{Store: store, AppConfig: cfg}
 }
 
-// RegisterRoutes connects search routes to the Gin engine.
-func (h *SearchHandler) RegisterRoutes(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	searchRoutes := router.Group("/search")
-	searchRoutes.Use(authMiddleware)
-	{
-		searchRoutes.GET("", h.Search)
-	}
-}
-
 func (h *SearchHandler) Search(c *gin.Context) {}

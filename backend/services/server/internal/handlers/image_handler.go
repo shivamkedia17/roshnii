@@ -18,19 +18,18 @@ import (
 	"github.com/shivamkedia17/roshnii/shared/pkg/storage" // Add this import
 )
 
-// Modify ImageHandler to include storage
+// Requires Access to Blob Storage
 type ImageHandler struct {
-	Store     db.ImageStore
-	Storage   storage.BlobStorage // Add storage field
-	AppConfig *config.Config
+	Config  *config.Config
+	DB      db.ImageStore
+	Storage storage.BlobStorage
 }
 
-// Modify constructor
-func NewImageHandler(store db.ImageStore, storage storage.BlobStorage, cfg *config.Config) *ImageHandler {
+func NewImageHandler(config *config.Config, db db.ImageStore, storage storage.BlobStorage) *ImageHandler {
 	return &ImageHandler{
-		Store:     store,
-		Storage:   storage,
-		AppConfig: cfg,
+		Config:  config,
+		DB:      db,
+		Storage: storage,
 	}
 }
 
@@ -109,7 +108,7 @@ func (h *ImageHandler) HandleUploadImage(c *gin.Context) {
 		UpdatedAt:   time.Now(),
 	}
 
-	err = h.Store.CreateImageMetadata(c.Request.Context(), metadata)
+	err = h.DB.CreateImageMetadata(c.Request.Context(), metadata)
 	if err != nil {
 		// If DB storage fails, try to clean up the file we just uploaded
 		cleanupErr := h.Storage.Delete(c.Request.Context(), storagePath)
@@ -138,7 +137,7 @@ func (h *ImageHandler) HandleDownloadImage(c *gin.Context) {
 	imageID := c.Param("id")
 
 	// Get the image metadata from the database
-	meta, err := h.Store.GetImageByID(c.Request.Context(), userID, imageID)
+	meta, err := h.DB.GetImageByID(c.Request.Context(), userID, imageID)
 	if err != nil {
 		if err.Error() == "image not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
@@ -177,7 +176,7 @@ func (h *ImageHandler) HandleGetImage(c *gin.Context) {
 		return
 	}
 	imageID := c.Param("id")
-	meta, err := h.Store.GetImageByID(c.Request.Context(), userID, imageID)
+	meta, err := h.DB.GetImageByID(c.Request.Context(), userID, imageID)
 	if err != nil {
 		if err.Error() == "image not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
@@ -200,7 +199,7 @@ func (h *ImageHandler) HandleDeleteImage(c *gin.Context) {
 	imageID := c.Param("id")
 
 	// Get the image metadata from the database
-	meta, err := h.Store.GetImageByID(c.Request.Context(), userID, imageID)
+	meta, err := h.DB.GetImageByID(c.Request.Context(), userID, imageID)
 	if err != nil {
 		if err.Error() == "image not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Image not found"})
@@ -219,7 +218,7 @@ func (h *ImageHandler) HandleDeleteImage(c *gin.Context) {
 
 	// Delete the metadata from the database
 	// We need to implement this method in the PostgresStore
-	if err := h.Store.DeleteImageByID(c.Request.Context(), userID, imageID); err != nil {
+	if err := h.DB.DeleteImageByID(c.Request.Context(), userID, imageID); err != nil {
 		log.Printf("Error deleting image metadata from database: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete image metadata"})
 		return
@@ -237,7 +236,7 @@ func (h *ImageHandler) HandleListImages(c *gin.Context) {
 	}
 
 	// Use the actual DB store method
-	images, err := h.Store.ListImagesByUserID(c.Request.Context(), userID)
+	images, err := h.DB.ListImagesByUserID(c.Request.Context(), userID)
 	if err != nil {
 		log.Printf("Error listing images for user %s: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve images"})
@@ -249,18 +248,4 @@ func (h *ImageHandler) HandleListImages(c *gin.Context) {
 
 	log.Printf("Retrieved %d images for user %s", len(images), userID)
 	c.JSON(http.StatusOK, images)
-}
-
-// RegisterRoutes connects image routes to the Gin engine.
-func (h *ImageHandler) RegisterRoutes(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-	// Upload endpoint
-	router.POST("/upload", authMiddleware, h.HandleUploadImage)
-	// List user images
-	router.GET("/images", authMiddleware, h.HandleListImages)
-	// Single image metadata
-	router.GET("/image/:id", authMiddleware, h.HandleGetImage)
-	// Download image file
-	router.GET("/image/:id/download", authMiddleware, h.HandleDownloadImage)
-	// Delete image
-	router.DELETE("/image/:id", authMiddleware, h.HandleDeleteImage)
 }

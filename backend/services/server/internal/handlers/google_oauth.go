@@ -1,4 +1,4 @@
-package auth
+package handlers
 
 import (
 	"context"
@@ -21,7 +21,17 @@ import (
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
 )
 
-const oauthStateCookieName = "oauthstate"
+const OauthStateCookieName = "oauthstate"
+
+// generateState generates a random string for the OAuth state parameter.
+func generateState() (string, error) {
+	b := make([]byte, 32) // Increased size for better security
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random bytes for state: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
 
 // GoogleOAuthService handles the Google OAuth2 flow.
 type GoogleOAuthService struct {
@@ -55,16 +65,6 @@ func NewGoogleOAuthService(cfg *config.Config, userStore db.UserStore, jwtServic
 	}
 }
 
-// generateState generates a random string for the OAuth state parameter.
-func generateState() (string, error) {
-	b := make([]byte, 32) // Increased size for better security
-	_, err := rand.Read(b)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate random bytes for state: %w", err)
-	}
-	return base64.URLEncoding.EncodeToString(b), nil
-}
-
 // HandleLogin initiates the Google OAuth process by redirecting the user.
 func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
 	state, err := generateState()
@@ -82,7 +82,7 @@ func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
 
 	// Store the state in a secure, HttpOnly cookie
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     oauthStateCookieName,
+		Name:     OauthStateCookieName,
 		Value:    state,
 		HttpOnly: true,
 		Secure:   secureCookie,                        // Use Secure in prod/staging
@@ -99,7 +99,7 @@ func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
 // HandleCallback handles the callback from Google after user authorization.
 func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 	// 1. Verify State
-	storedState, err := c.Cookie(oauthStateCookieName)
+	storedState, err := c.Cookie(OauthStateCookieName)
 	if err != nil {
 		log.Printf("OAuth Callback Error: State cookie not found: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session state. Please try logging in again."})
@@ -107,7 +107,7 @@ func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 	}
 	// Clear the state cookie once used
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:   oauthStateCookieName,
+		Name:   OauthStateCookieName,
 		Value:  "",
 		Path:   "/",
 		MaxAge: -1, // Delete cookie

@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/shivamkedia17/roshnii/services/server/internal/auth" // Adjust import paths
+	handlers "github.com/shivamkedia17/roshnii/services/server/internal/handlers/auth"
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
 )
 
@@ -18,7 +18,7 @@ const (
 )
 
 // AuthMiddleware creates a Gin middleware for JWT authentication.
-func AuthMiddleware(jwtService auth.JWTService) gin.HandlerFunc {
+func AuthMiddleware(jwtService handlers.JWTService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Check if this is a dev route
 		isDev := os.Getenv("ENVIRONMENT") == "development"
@@ -86,12 +86,12 @@ func AuthMiddleware(jwtService auth.JWTService) gin.HandlerFunc {
 
 // GetUserClaims retrieves user claims from the Gin context.
 // Returns nil if claims are not found or invalid.
-func GetUserClaims(c *gin.Context) *auth.Claims {
+func GetUserClaims(c *gin.Context) *handlers.Claims {
 	claims, exists := c.Get(UserContextKey)
 	if !exists {
 		return nil
 	}
-	userClaims, ok := claims.(*auth.Claims)
+	userClaims, ok := claims.(*handlers.Claims)
 	if !ok {
 		return nil
 	}
