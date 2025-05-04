@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/shivamkedia17/roshnii/services/server/internal/auth"
 	"github.com/shivamkedia17/roshnii/services/server/internal/middleware"
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
@@ -18,23 +19,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const MOCKUSERID = "mocktestuseridvvunique"
+
 // MockAlbumStore is a mock implementation of the AlbumStore interface for testing
 type MockAlbumStore struct {
-	albums      map[int64]models.Album
-	albumImages map[int64][]string // Album ID -> slice of image IDs
+	albums      map[models.AlbumID]models.Album
+	albumImages map[models.AlbumID][]string // Album ID -> slice of image IDs
 }
 
 func NewMockAlbumStore() *MockAlbumStore {
 	return &MockAlbumStore{
-		albums:      make(map[int64]models.Album),
-		albumImages: make(map[int64][]string),
+		albums:      make(map[models.AlbumID]models.Album),
+		albumImages: make(map[models.AlbumID][]string),
 	}
 }
 
 // Implement AlbumStore methods
 func (m *MockAlbumStore) CreateAlbum(ctx context.Context, userID models.UserID, name, description string) (*models.Album, error) {
 	// Generate a unique ID for the new album
-	newID := int64(len(m.albums) + 1)
+	newID := uuid.New().String()
 
 	// Create album with current time
 	album := models.Album{
@@ -67,7 +70,7 @@ func (m *MockAlbumStore) ListAlbumsByUserID(ctx context.Context, userID models.U
 	return userAlbums, nil
 }
 
-func (m *MockAlbumStore) GetAlbumByID(ctx context.Context, userID models.UserID, albumID int64) (*models.Album, error) {
+func (m *MockAlbumStore) GetAlbumByID(ctx context.Context, userID models.UserID, albumID models.AlbumID) (*models.Album, error) {
 	album, exists := m.albums[albumID]
 	if !exists {
 		return nil, errors.New("album not found")
@@ -81,7 +84,7 @@ func (m *MockAlbumStore) GetAlbumByID(ctx context.Context, userID models.UserID,
 	return &album, nil
 }
 
-func (m *MockAlbumStore) UpdateAlbum(ctx context.Context, userID models.UserID, albumID int64, name, description string) error {
+func (m *MockAlbumStore) UpdateAlbum(ctx context.Context, userID models.UserID, albumID models.AlbumID, name, description string) error {
 	album, exists := m.albums[albumID]
 	if !exists {
 		return errors.New("album not found")
@@ -103,7 +106,7 @@ func (m *MockAlbumStore) UpdateAlbum(ctx context.Context, userID models.UserID, 
 	return nil
 }
 
-func (m *MockAlbumStore) DeleteAlbum(ctx context.Context, userID models.UserID, albumID int64) error {
+func (m *MockAlbumStore) DeleteAlbum(ctx context.Context, userID models.UserID, albumID models.AlbumID) error {
 	album, exists := m.albums[albumID]
 	if !exists {
 		return errors.New("album not found")
@@ -121,7 +124,7 @@ func (m *MockAlbumStore) DeleteAlbum(ctx context.Context, userID models.UserID, 
 	return nil
 }
 
-func (m *MockAlbumStore) AddImageToAlbum(ctx context.Context, userID models.UserID, albumID int64, imageID models.ImageID) error {
+func (m *MockAlbumStore) AddImageToAlbum(ctx context.Context, userID models.UserID, albumID models.AlbumID, imageID models.ImageID) error {
 	album, exists := m.albums[albumID]
 	if !exists {
 		return errors.New("album not found")
@@ -150,7 +153,7 @@ func (m *MockAlbumStore) AddImageToAlbum(ctx context.Context, userID models.User
 	return nil
 }
 
-func (m *MockAlbumStore) RemoveImageFromAlbum(ctx context.Context, userID models.UserID, albumID int64, imageID models.ImageID) error {
+func (m *MockAlbumStore) RemoveImageFromAlbum(ctx context.Context, userID models.UserID, albumID models.AlbumID, imageID models.ImageID) error {
 	album, exists := m.albums[albumID]
 	if !exists {
 		return errors.New("album not found")
@@ -185,7 +188,7 @@ func (m *MockAlbumStore) RemoveImageFromAlbum(ctx context.Context, userID models
 	return nil
 }
 
-func (m *MockAlbumStore) ListImagesInAlbum(ctx context.Context, userID models.UserID, albumID int64) ([]models.ImageMetadata, error) {
+func (m *MockAlbumStore) ListImagesInAlbum(ctx context.Context, userID models.UserID, albumID models.AlbumID) ([]models.ImageMetadata, error) {
 	album, exists := m.albums[albumID]
 	if !exists {
 		return nil, errors.New("album not found")
@@ -223,7 +226,7 @@ func TestAlbumHandlerCreateAlbum(t *testing.T) {
 	// Mock authentication middleware
 	authMW := func(c *gin.Context) {
 		// Set a mock user ID
-		c.Set(middleware.UserContextKey, &auth.Claims{UserID: 1, Email: "test@example.com"})
+		c.Set(middleware.UserContextKey, &auth.Claims{UserID: MOCKUSERID, Email: "test@example.com"})
 		c.Next()
 	}
 
@@ -258,5 +261,5 @@ func TestAlbumHandlerCreateAlbum(t *testing.T) {
 	assert.NotZero(t, response.ID)
 	assert.Equal(t, "Test Album", response.Name)
 	assert.Equal(t, "This is a test album", response.Description)
-	assert.Equal(t, models.UserID(1), response.UserID)
+	assert.Equal(t, MOCKUSERID, response.UserID)
 }

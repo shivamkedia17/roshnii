@@ -80,7 +80,7 @@ func (s *jwtService) GenerateToken(user *models.User) (string, error) {
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "roshnii-service",
-			Subject:   fmt.Sprintf("%d", user.ID),
+			Subject:   fmt.Sprintf("%s", user.ID),
 		},
 	}
 
@@ -151,7 +151,7 @@ func (s *jwtService) ValidateToken(tokenString string) (*Claims, error) {
 
 	// Enhanced validation
 	// Additional check: ensure UserID is present
-	if claims.UserID == 0 {
+	if claims.UserID == "" {
 		return nil, fmt.Errorf("invalid token: missing user ID")
 	}
 
@@ -189,7 +189,7 @@ func (s *jwtService) ValidateRefreshToken(tokenString string) (*Claims, error) {
 		return nil, fmt.Errorf("invalid token type: expected refresh token")
 	}
 
-	if claims.UserID == 0 {
+	if claims.UserID == "" {
 		return nil, fmt.Errorf("invalid token: missing user ID")
 	}
 

@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/shivamkedia17/roshnii/shared/pkg/models"
 )
 
 // LocalStorage implements BlobStorage using the local filesystem
@@ -25,9 +27,9 @@ func NewLocalStorage(basePath string) (*LocalStorage, error) {
 }
 
 // Upload stores a file on the local filesystem
-func (s *LocalStorage) Upload(ctx context.Context, filename string, userId int64, content io.Reader, contentType string) (string, error) {
+func (s *LocalStorage) Upload(ctx context.Context, filename string, userId models.UserID, content io.Reader, contentType string) (string, error) {
 	// Create a user-specific directory
-	userDir := filepath.Join(s.BasePath, fmt.Sprintf("user_%d", userId))
+	userDir := filepath.Join(s.BasePath, fmt.Sprintf("user_%s", userId))
 	if err := os.MkdirAll(userDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create user directory: %w", err)
 	}
@@ -35,7 +37,7 @@ func (s *LocalStorage) Upload(ctx context.Context, filename string, userId int64
 	// Generate a unique filename (you can improve this with UUID)
 	timestamp := time.Now().UnixNano()
 	uniqueFilename := fmt.Sprintf("%d_%s", timestamp, filepath.Base(filename))
-	storagePath := filepath.Join(fmt.Sprintf("user_%d", userId), uniqueFilename)
+	storagePath := filepath.Join(fmt.Sprintf("user_%s", userId), uniqueFilename)
 	fullPath := filepath.Join(s.BasePath, storagePath)
 
 	// Create the file

@@ -3,7 +3,6 @@ package handlers
 import (
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shivamkedia17/roshnii/services/server/internal/middleware"
@@ -41,7 +40,7 @@ func (h *AlbumHandler) RegisterRoutes(router *gin.RouterGroup, authMiddleware gi
 // CreateAlbum handles the creation of a new album
 func (h *AlbumHandler) CreateAlbum(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
@@ -70,37 +69,32 @@ func (h *AlbumHandler) CreateAlbum(c *gin.Context) {
 // ListAlbums retrieves all albums for the authenticated user
 func (h *AlbumHandler) ListAlbums(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
 
 	albums, err := h.Store.ListAlbumsByUserID(c.Request.Context(), userID)
 	if err != nil {
-		log.Printf("Error listing albums for user %d: %v", userID, err)
+		log.Printf("Error listing albums for user %s: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve albums: " + err.Error()})
 		return
 	}
 
-	log.Printf("Successfully retrieved %d albums for user %d", len(albums), userID)
+	log.Printf("Successfully retrieved %d albums for user %s", len(albums), userID)
 	c.JSON(http.StatusOK, albums)
 }
 
 // GetAlbum retrieves a specific album by ID
 func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
 
 	// Parse album ID from URL
-	albumID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid album ID"})
-		return
-	}
-
+	albumID := c.Param("id")
 	album, err := h.Store.GetAlbumByID(c.Request.Context(), userID, albumID)
 	if err != nil {
 		if err.Error() == "album not found" {
@@ -118,17 +112,13 @@ func (h *AlbumHandler) GetAlbum(c *gin.Context) {
 // UpdateAlbum updates an existing album
 func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
 
 	// Parse album ID from URL
-	albumID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid album ID"})
-		return
-	}
+	albumID := c.Param("id")
 
 	// Bind request body
 	var req struct {
@@ -141,7 +131,7 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 		return
 	}
 
-	err = h.Store.UpdateAlbum(c.Request.Context(), userID, albumID, req.Name, req.Description)
+	err := h.Store.UpdateAlbum(c.Request.Context(), userID, albumID, req.Name, req.Description)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -158,19 +148,15 @@ func (h *AlbumHandler) UpdateAlbum(c *gin.Context) {
 // DeleteAlbum deletes an album
 func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
 
 	// Parse album ID from URL
-	albumID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid album ID"})
-		return
-	}
+	albumID := c.Param("id")
 
-	err = h.Store.DeleteAlbum(c.Request.Context(), userID, albumID)
+	err := h.Store.DeleteAlbum(c.Request.Context(), userID, albumID)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -187,17 +173,13 @@ func (h *AlbumHandler) DeleteAlbum(c *gin.Context) {
 // AddImageToAlbum adds an image to an album
 func (h *AlbumHandler) AddImageToAlbum(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
 
 	// Parse album ID from URL
-	albumID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid album ID"})
-		return
-	}
+	albumID := c.Param("id")
 
 	// Bind request body
 	var req struct {
@@ -209,7 +191,7 @@ func (h *AlbumHandler) AddImageToAlbum(c *gin.Context) {
 		return
 	}
 
-	err = h.Store.AddImageToAlbum(c.Request.Context(), userID, albumID, req.ImageID)
+	err := h.Store.AddImageToAlbum(c.Request.Context(), userID, albumID, req.ImageID)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -230,17 +212,13 @@ func (h *AlbumHandler) AddImageToAlbum(c *gin.Context) {
 // RemoveImageFromAlbum removes an image from an album
 func (h *AlbumHandler) RemoveImageFromAlbum(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
 
 	// Parse album ID and image ID from URL
-	albumID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid album ID"})
-		return
-	}
+	albumID := c.Param("id")
 
 	imageID := c.Param("image_id")
 	if imageID == "" {
@@ -248,7 +226,7 @@ func (h *AlbumHandler) RemoveImageFromAlbum(c *gin.Context) {
 		return
 	}
 
-	err = h.Store.RemoveImageFromAlbum(c.Request.Context(), userID, albumID, imageID)
+	err := h.Store.RemoveImageFromAlbum(c.Request.Context(), userID, albumID, imageID)
 	if err != nil {
 		if err.Error() == "album not found" {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Album not found"})
@@ -269,17 +247,12 @@ func (h *AlbumHandler) RemoveImageFromAlbum(c *gin.Context) {
 // ListAlbumImages retrieves all images in a specific album
 func (h *AlbumHandler) ListAlbumImages(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
 
-	// Parse album ID from URL
-	albumID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid album ID"})
-		return
-	}
+	albumID := c.Param("id")
 
 	images, err := h.Store.ListImagesInAlbum(c.Request.Context(), userID, albumID)
 	if err != nil {

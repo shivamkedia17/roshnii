@@ -37,7 +37,7 @@ func NewImageHandler(store db.ImageStore, storage storage.BlobStorage, cfg *conf
 // Update HandleUploadImage to store the actual file
 func (h *ImageHandler) HandleUploadImage(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
@@ -129,7 +129,7 @@ func (h *ImageHandler) HandleUploadImage(c *gin.Context) {
 // Implement HandleDownloadImage to serve the actual file
 func (h *ImageHandler) HandleDownloadImage(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
@@ -172,7 +172,7 @@ func (h *ImageHandler) HandleDownloadImage(c *gin.Context) {
 // HandleGetImage retrieves metadata for a single image.
 func (h *ImageHandler) HandleGetImage(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
@@ -191,7 +191,7 @@ func (h *ImageHandler) HandleGetImage(c *gin.Context) {
 
 func (h *ImageHandler) HandleDeleteImage(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
@@ -231,7 +231,7 @@ func (h *ImageHandler) HandleDeleteImage(c *gin.Context) {
 // HandleListImages retrieves images for the logged-in user.
 func (h *ImageHandler) HandleListImages(c *gin.Context) {
 	userID := middleware.GetUserID(c)
-	if userID == 0 {
+	if userID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user session"})
 		return
 	}
@@ -239,7 +239,7 @@ func (h *ImageHandler) HandleListImages(c *gin.Context) {
 	// Use the actual DB store method
 	images, err := h.Store.ListImagesByUserID(c.Request.Context(), userID)
 	if err != nil {
-		log.Printf("Error listing images for user %d: %v", userID, err)
+		log.Printf("Error listing images for user %s: %v", userID, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve images"})
 		return
 	}
@@ -247,7 +247,7 @@ func (h *ImageHandler) HandleListImages(c *gin.Context) {
 	// If no images found, the DB function should return an empty slice `[]models.ImageMetadata{}`
 	// So no need for explicit nil check here if DB function is correct.
 
-	log.Printf("Retrieved %d images for user %d", len(images), userID)
+	log.Printf("Retrieved %d images for user %s", len(images), userID)
 	c.JSON(http.StatusOK, images)
 }
 

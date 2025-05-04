@@ -176,7 +176,7 @@ func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 	// --- Added Logging ---
 	log.Printf("------------------------------------------")
 	log.Printf("OAuth Callback: Found/Created Internal User:")
-	log.Printf("  User ID:       %d", user.ID)
+	log.Printf("  User ID:       %s", user.ID)
 	log.Printf("  Email:         %s", user.Email)
 	log.Printf("  Name:          %s", user.Name)
 	log.Printf("  Auth Provider: %s", user.AuthProvider)
@@ -225,10 +225,10 @@ func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 	})
 
 	// --- Added Logging ---
-	log.Printf("OAuth Callback: Set auth_token cookie successfully for user %d.", user.ID)
+	log.Printf("OAuth Callback: Set auth_token cookie successfully for user %s.", user.ID)
 
 	// 8. Redirect to Frontend
-	log.Printf("OAuth successful for user %s (%d). Redirecting to frontend: %s", user.Email, user.ID, s.AppConfig.FrontendURL)
+	log.Printf("OAuth successful for user %s (%s). Redirecting to frontend: %s", user.Email, user.ID, s.AppConfig.FrontendURL)
 	c.Redirect(http.StatusTemporaryRedirect, s.AppConfig.FrontendURL) // Redirect to the main page or dashboard
 }
 
@@ -272,17 +272,9 @@ func (s *GoogleOAuthService) fetchGoogleUserInfo(token *oauth2.Token) (*models.G
 
 // HandleLogout clears the authentication cookies and blacklists the token.
 func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
-	// Get current tokens before deleting cookies
+	// Get current tokens from cookies
 	accessToken, _ := c.Cookie("auth_token")
 	refreshToken, _ := c.Cookie("refresh_token")
-
-	// If no cookie token, try header (for dev mode)
-	if accessToken == "" {
-		authHeader := c.GetHeader("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			accessToken = strings.TrimPrefix(authHeader, "Bearer ")
-		}
-	}
 
 	// Blacklist tokens if they exist
 	if accessToken != "" {
@@ -319,19 +311,28 @@ func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	// Add explicit cache control headers
+	c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
+	c.Header("Pragma", "no-cache")
+
 	log.Printf("User logged out successfully.")
 	c.JSON(http.StatusOK, gin.H{"message": "Successfully logged out"})
 }
 
 // HandleRefreshToken processes token refresh requests
+// In production, this endpoint only accepts refresh tokens from cookies.
+// For development/testing, it can fall back to Authorization header.
 func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 	// Get refresh token from cookie
 	refreshToken, err := c.Cookie("refresh_token")
-	if err != nil {
-		// If no cookie, try getting from Authorization header (for dev/testing)
+
+	// Dev-only fallback: check Authorization header
+	if err != nil && s.AppConfig.Environment == "development" {
+		// This fallback is for development/testing only
 		authHeader := c.GetHeader("Authorization")
 		if strings.HasPrefix(authHeader, "Bearer ") {
 			refreshToken = strings.TrimPrefix(authHeader, "Bearer ")
+			log.Printf("DEV MODE: Using refresh token from Authorization header")
 		}
 	}
 
@@ -388,9 +389,14 @@ func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	// Return success
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Token refreshed successfully",
-		"token":   newAccessToken, // Include in response for dev mode
-	})
+	// Response with success message
+	response := gin.H{"message": "Token refreshed successfully"}
+
+	// Dev-only: Include token in response body for easier testing
+	if s.AppConfig.Environment == "development" {
+		response["token"] = newAccessToken
+		log.Printf("DEV MODE: Including token in refresh response")
+	}
+
+	c.JSON(http.StatusOK, response)
 }

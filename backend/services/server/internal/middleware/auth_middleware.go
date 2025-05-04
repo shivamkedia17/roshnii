@@ -3,6 +3,7 @@ package middleware
 import (
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -19,28 +20,28 @@ const (
 // AuthMiddleware creates a Gin middleware for JWT authentication.
 func AuthMiddleware(jwtService auth.JWTService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. Get token from Cookie (preferred) or Authorization header
+		// Check if this is a dev route
+		isDev := os.Getenv("ENVIRONMENT") == "development"
+		isDevRoute := isDev && strings.Contains(c.Request.URL.Path, "/dev/")
+
+		// 1. Get token - use cookie by default
 		tokenString := ""
 		cookie, err := c.Cookie("auth_token")
 		if err == nil && cookie != "" {
 			tokenString = cookie
-		} else {
-			// Fallback to Authorization header (e.g., "Bearer <token>")
+		} else if isDevRoute {
+			// Only allow Authorization header for dev routes
 			authHeader := c.GetHeader("Authorization")
-			if authHeader == "" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
-				return
+			if authHeader != "" {
+				parts := strings.Split(authHeader, " ")
+				if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
+					tokenString = parts[1]
+				}
 			}
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization header format"})
-				return
-			}
-			tokenString = parts[1]
 		}
 
 		if tokenString == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication token not found"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 			return
 		}
 
@@ -98,11 +99,11 @@ func GetUserClaims(c *gin.Context) *auth.Claims {
 }
 
 // GetUserID retrieves the UserID from the Gin context.
-// Returns 0 if claims are not found or invalid.
+// Returns empty string if claims are not found or invalid.
 func GetUserID(c *gin.Context) models.UserID {
 	claims := GetUserClaims(c)
 	if claims == nil {
-		return 0
+		return ""
 	}
 	return claims.UserID
 }

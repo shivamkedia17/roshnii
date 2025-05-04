@@ -22,7 +22,7 @@ type ImageStore interface {
 
 // CreateImageMetadata inserts metadata about a newly uploaded image.
 func (s *PostgresStore) CreateImageMetadata(ctx context.Context, meta *models.ImageMetadata) error {
-	log.Printf("DB: CreateImageMetadata called for UserID: %d, Filename: %s, ImageID: %s", meta.UserID, meta.Filename, meta.ID)
+	log.Printf("DB: CreateImageMetadata called for UserID: %s, Filename: %s, ImageID: %s", meta.UserID, meta.Filename, meta.ID)
 
 	query := `
         INSERT INTO images (id, user_id, filename, storage_path, content_type, size, width, height)
@@ -42,7 +42,7 @@ func (s *PostgresStore) CreateImageMetadata(ctx context.Context, meta *models.Im
 
 // ListImagesByUserID retrieves all image metadata for a specific user.
 func (s *PostgresStore) ListImagesByUserID(ctx context.Context, userID models.UserID) ([]models.ImageMetadata, error) {
-	log.Printf("DB: ListImagesByUserID called for UserID: %d", userID)
+	log.Printf("DB: ListImagesByUserID called for UserID: %s", userID)
 
 	query := `
         SELECT id, user_id, filename, storage_path, content_type, size, width, height, created_at, updated_at
@@ -52,7 +52,7 @@ func (s *PostgresStore) ListImagesByUserID(ctx context.Context, userID models.Us
 
 	rows, err := s.Pool.Query(ctx, query, userID)
 	if err != nil {
-		log.Printf("Error querying images for user %d: %v", userID, err)
+		log.Printf("Error querying images for user %s: %v", userID, err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -76,11 +76,11 @@ func (s *PostgresStore) ListImagesByUserID(ctx context.Context, userID models.Us
 
 	// Check for errors encountered during iteration
 	if err = rows.Err(); err != nil {
-		log.Printf("Error after iterating image rows for user %d: %v", userID, err)
+		log.Printf("Error after iterating image rows for user %s: %v", userID, err)
 		return nil, err
 	}
 
-	log.Printf("DB: Found %d images for user ID: %d", len(images), userID)
+	log.Printf("DB: Found %d images for user ID: %s", len(images), userID)
 	// Return empty slice if no images found, not nil
 	if images == nil {
 		images = []models.ImageMetadata{}
@@ -90,7 +90,7 @@ func (s *PostgresStore) ListImagesByUserID(ctx context.Context, userID models.Us
 
 // GetImageByID retrieves metadata for a single image belonging to a user.
 func (s *PostgresStore) GetImageByID(ctx context.Context, userID models.UserID, imageID models.ImageID) (*models.ImageMetadata, error) {
-	log.Printf("DB: GetImageByID called for UserID: %d, ImageID: %s", userID, imageID)
+	log.Printf("DB: GetImageByID called for UserID: %s ImageID: %s", userID, imageID)
 
 	query := `
         SELECT id, user_id, filename, storage_path, content_type, size, width, height, created_at, updated_at
@@ -113,7 +113,7 @@ func (s *PostgresStore) GetImageByID(ctx context.Context, userID models.UserID, 
 
 // DeleteImageByID removes image metadata from the database
 func (s *PostgresStore) DeleteImageByID(ctx context.Context, userID models.UserID, imageID models.ImageID) error {
-	log.Printf("DB: DeleteImageByID called for UserID: %d, ImageID: %s", userID, imageID)
+	log.Printf("DB: DeleteImageByID called for UserID: %s, ImageID: %s", userID, imageID)
 
 	query := `
 		DELETE FROM images
