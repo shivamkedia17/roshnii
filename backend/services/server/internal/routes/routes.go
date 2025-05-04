@@ -9,13 +9,6 @@ import (
 	"github.com/shivamkedia17/roshnii/shared/pkg/config"
 )
 
-type RouterEnv string
-
-const (
-	Dev        RouterEnv = "development"
-	Production           = "production"
-)
-
 func RegisterAuth(routerGroup *gin.RouterGroup, authMiddleware gin.HandlerFunc, h *handlers.GoogleOAuthService) {
 	googleRoutes := routerGroup.Group("/auth/google")
 	{
@@ -75,14 +68,14 @@ func RegisterUserRoutes(routerGroup *gin.RouterGroup, authMiddleware gin.Handler
 // 	}
 // }
 
-func SetupRouter(config *config.Config, handlers *handlers.Handlers, authMiddleware gin.HandlerFunc) *gin.Engine {
+func SetupRouter(cfg *config.Config, handlers *handlers.Handlers, authMiddleware gin.HandlerFunc) *gin.Engine {
 	// a. Extract Relevant Config
-	environment := config.Environment
-	frontEndURL := config.FrontendURL
+	environment := cfg.Environment
+	frontEndURL := cfg.FrontendURL
 	// TODO // serverURL 	:= deps.Config.ServerHost
 
 	// b. Setup Gin Engine
-	if environment == Production {
+	if environment == config.ProdEnvironment {
 		gin.SetMode(gin.ReleaseMode)
 	}
 

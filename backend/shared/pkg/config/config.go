@@ -11,6 +11,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	DevEnvironment  string = "development"
+	ProdEnvironment        = "production"
+)
+
 type Config struct {
 	// Environment defines the running environment (e.g., "development", "staging", "production")
 	Environment string `mapstructure:"ENVIRONMENT"`
@@ -47,7 +52,7 @@ type Config struct {
 // LoadConfig loads configuration from file and environment variables.
 func LoadConfig(path string) (*Config, error) {
 	// Set defaults
-	viper.SetDefault("ENVIRONMENT", "development")
+	viper.SetDefault("ENVIRONMENT", DevEnvironment)
 	viper.SetDefault("LOG_LEVEL", "info")
 	viper.SetDefault("SERVER_HOST", "0.0.0.0") // Default host
 	viper.SetDefault("SERVER_PORT", "8080")

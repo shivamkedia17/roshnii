@@ -3,12 +3,11 @@ package middleware
 import (
 	"log"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 
-	handlers "github.com/shivamkedia17/roshnii/services/server/internal/handlers/auth"
+	"github.com/shivamkedia17/roshnii/shared/pkg/jwt"
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
 )
 
@@ -18,35 +17,17 @@ const (
 )
 
 // AuthMiddleware creates a Gin middleware for JWT authentication.
-func AuthMiddleware(jwtService handlers.JWTService) gin.HandlerFunc {
+func AuthMiddleware(jwtService jwt.JWTService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Check if this is a dev route
-		isDev := os.Getenv("ENVIRONMENT") == "development"
-		isDevRoute := isDev && strings.Contains(c.Request.URL.Path, "/dev/")
-
-		// 1. Get token - use cookie by default
-		tokenString := ""
-		cookie, err := c.Cookie("auth_token")
-		if err == nil && cookie != "" {
-			tokenString = cookie
-		} else if isDevRoute {
-			// Only allow Authorization header for dev routes
-			authHeader := c.GetHeader("Authorization")
-			if authHeader != "" {
-				parts := strings.Split(authHeader, " ")
-				if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
-					tokenString = parts[1]
-				}
-			}
-		}
-
-		if tokenString == "" {
+		// 1. Get auth token from cookie
+		cookie, err := c.Cookie(jwt.AuthTokenCookie)
+		if err == nil && cookie == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 			return
 		}
 
 		// Validate the token
-		claims, err := jwtService.ValidateToken(tokenString)
+		claims, err := jwtService.ValidateToken(cookie)
 		if err != nil {
 			errorMessage := "Invalid or expired token"
 			statusCode := http.StatusUnauthorized
@@ -86,12 +67,12 @@ func AuthMiddleware(jwtService handlers.JWTService) gin.HandlerFunc {
 
 // GetUserClaims retrieves user claims from the Gin context.
 // Returns nil if claims are not found or invalid.
-func GetUserClaims(c *gin.Context) *handlers.Claims {
+func GetUserClaims(c *gin.Context) *jwt.Claims {
 	claims, exists := c.Get(UserContextKey)
 	if !exists {
 		return nil
 	}
-	userClaims, ok := claims.(*handlers.Claims)
+	userClaims, ok := claims.(*jwt.Claims)
 	if !ok {
 		return nil
 	}

@@ -10,6 +10,12 @@ import (
 	"github.com/shivamkedia17/roshnii/shared/pkg/models" // Adjust import path
 )
 
+const (
+	StateCookie        string = "state"
+	AuthTokenCookie           = "auth_token"
+	RefreshTokenCookie        = "refresh_token"
+)
+
 // JWTService handles JWT generation and validation.
 type JWTService interface {
 	GenerateToken(user *models.User) (string, error)

@@ -9,7 +9,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,10 +17,9 @@ import (
 
 	"github.com/shivamkedia17/roshnii/shared/pkg/config" // Adjust import paths
 	"github.com/shivamkedia17/roshnii/shared/pkg/db"
+	"github.com/shivamkedia17/roshnii/shared/pkg/jwt"
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
 )
-
-const OauthStateCookieName = "oauthstate"
 
 // generateState generates a random string for the OAuth state parameter.
 func generateState() (string, error) {
@@ -35,21 +33,21 @@ func generateState() (string, error) {
 
 // GoogleOAuthService handles the Google OAuth2 flow.
 type GoogleOAuthService struct {
-	Config     *oauth2.Config
-	UserStore  db.UserStore
-	JWTService JWTService
-	AppConfig  *config.Config // Store App config for FrontendURL etc.
+	Config      *config.Config // Store App config for FrontendURL etc.
+	DB          db.UserStore
+	JWTService  jwt.JWTService
+	OAuthConfig *oauth2.Config
 }
 
 // NewGoogleOAuthService initializes the Google OAuth service.
-func NewGoogleOAuthService(cfg *config.Config, userStore db.UserStore, jwtService JWTService) *GoogleOAuthService {
+func NewGoogleOAuthService(cfg *config.Config, userStore db.UserStore, jwtService jwt.JWTService) *GoogleOAuthService {
 
 	// redirectURL := fmt.Sprintf("http://%s:%s/api/auth/google/callback", cfg.ServerHost, cfg.ServerPort)
 	redirectURL := fmt.Sprintf("http://%s:%s/api/auth/google/callback", cfg.PublicHost, cfg.PublicPort)
 	log.Printf("Using Google OAuth Redirect URL: %s", redirectURL)
 
 	return &GoogleOAuthService{
-		Config: &oauth2.Config{
+		OAuthConfig: &oauth2.Config{
 			ClientID:     cfg.GoogleClientID,
 			ClientSecret: cfg.GoogleClientSecret,
 			RedirectURL:  redirectURL,
@@ -59,182 +57,15 @@ func NewGoogleOAuthService(cfg *config.Config, userStore db.UserStore, jwtServic
 			},
 			Endpoint: google.Endpoint,
 		},
-		UserStore:  userStore,
+		DB:         userStore,
 		JWTService: jwtService,
-		AppConfig:  cfg,
+		Config:     cfg,
 	}
-}
-
-// HandleLogin initiates the Google OAuth process by redirecting the user.
-func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
-	state, err := generateState()
-	if err != nil {
-		log.Printf("Error generating OAuth state: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate login"})
-		return
-	}
-
-	secureCookie := s.AppConfig.Environment != "development"
-	sameSiteMode := http.SameSiteNoneMode
-	if !secureCookie {
-		sameSiteMode = http.SameSiteLaxMode
-	}
-
-	// Store the state in a secure, HttpOnly cookie
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     OauthStateCookieName,
-		Value:    state,
-		HttpOnly: true,
-		Secure:   secureCookie,                        // Use Secure in prod/staging
-		Path:     "/",                                 // Accessible across the domain
-		MaxAge:   int(10 * time.Minute / time.Second), // 10 minutes validity
-		SameSite: sameSiteMode,                        // Good default for OAuth redirects
-	})
-
-	// Redirect user to Google's consent page
-	url := s.Config.AuthCodeURL(state, oauth2.AccessTypeOffline) // Request refresh token if needed later
-	c.Redirect(http.StatusTemporaryRedirect, url)
-}
-
-// HandleCallback handles the callback from Google after user authorization.
-func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
-	// 1. Verify State
-	storedState, err := c.Cookie(OauthStateCookieName)
-	if err != nil {
-		log.Printf("OAuth Callback Error: State cookie not found: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid session state. Please try logging in again."})
-		return
-	}
-	// Clear the state cookie once used
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:   OauthStateCookieName,
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1, // Delete cookie
-	})
-
-	queryState := c.Query("state")
-	if queryState == "" || queryState != storedState {
-		log.Printf("OAuth Callback Error: Invalid state parameter. Expected '%s', got '%s'", storedState, queryState)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OAuth state."})
-		return
-	}
-
-	// 2. Handle Potential Errors from Google
-	errorParam := c.Query("error")
-	if errorParam != "" {
-		errorDesc := c.Query("error_description")
-		log.Printf("OAuth Callback Error from Google: %s - %s", errorParam, errorDesc)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: " + errorParam})
-		// Optionally redirect to a frontend error page
-		// c.Redirect(http.StatusTemporaryRedirect, s.AppConfig.FrontendURL+"/login?error="+errorParam)
-		return
-	}
-
-	// 3. Exchange Code for Token
-	code := c.Query("code")
-	if code == "" {
-		log.Println("OAuth Callback Error: No code parameter in the request.")
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Authorization code missing."})
-		return
-	}
-
-	token, err := s.Config.Exchange(context.Background(), code)
-	if err != nil {
-		log.Printf("OAuth Callback Error: Failed to exchange code for token: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process login."})
-		return
-	}
-	// Note: You might want to store token.RefreshToken securely if you need offline access later.
-
-	googleUser, err := s.fetchGoogleUserInfo(token)
-	if err != nil {
-		log.Printf("OAuth Callback Error: Failed to get user info from Google: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user information."})
-		return
-	}
-
-	// --- Added Logging ---
-	log.Printf("------------------------------------------")
-	log.Printf("OAuth Callback: Fetched Google User Info:")
-	log.Printf("  ID (sub):      %s", googleUser.ID)
-	log.Printf("  Email:         %s", googleUser.Email)
-	log.Printf("  Verified:      %t", googleUser.VerifiedEmail)
-	log.Printf("  Name:          %s", googleUser.Name)
-	log.Printf("  Picture URL:   %s", googleUser.Picture)
-	log.Printf("------------------------------------------")
-	// --- End Added Logging ---
-
-	// 5. Find or Create User in DB
-	user, err := s.UserStore.FindOrCreateUserByGoogleID(c.Request.Context(), googleUser)
-	if err != nil {
-		log.Printf("OAuth Callback Error: Database operation failed: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user data."})
-		return
-	}
-
-	// --- Added Logging ---
-	log.Printf("------------------------------------------")
-	log.Printf("OAuth Callback: Found/Created Internal User:")
-	log.Printf("  User ID:       %s", user.ID)
-	log.Printf("  Email:         %s", user.Email)
-	log.Printf("  Name:          %s", user.Name)
-	log.Printf("  Auth Provider: %s", user.AuthProvider)
-	log.Printf("  Created At:    %s", user.CreatedAt.String()) // Convert time to string
-	log.Printf("------------------------------------------")
-	// --- End Added Logging ---
-
-	// 6. Generate JWT tokens (access + refresh)
-	accessToken, err := s.JWTService.GenerateToken(user)
-	if err != nil {
-		log.Printf("OAuth Callback Error: Failed to generate access token: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete login."})
-		return
-	}
-
-	refreshToken, err := s.JWTService.GenerateRefreshToken(user)
-	if err != nil {
-		log.Printf("OAuth Callback Error: Failed to generate refresh token: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete login."})
-		return
-	}
-
-	// 7. Set JWT cookies
-	secureCookie := s.AppConfig.Environment != "development"
-
-	// Set access token cookie
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "auth_token",
-		Value:    accessToken,
-		HttpOnly: true,
-		Secure:   secureCookie,
-		Path:     "/",
-		MaxAge:   int(s.AppConfig.TokenDuration / time.Second),
-		SameSite: http.SameSiteLaxMode,
-	})
-
-	// Set refresh token cookie with longer expiration
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "refresh_token",
-		Value:    refreshToken,
-		HttpOnly: true,
-		Secure:   secureCookie,
-		Path:     "/",
-		MaxAge:   int(s.AppConfig.TokenDuration * 7 / time.Second), // 7x longer
-		SameSite: http.SameSiteLaxMode,
-	})
-
-	// --- Added Logging ---
-	log.Printf("OAuth Callback: Set auth_token cookie successfully for user %s.", user.ID)
-
-	// 8. Redirect to Frontend
-	log.Printf("OAuth successful for user %s (%s). Redirecting to frontend: %s", user.Email, user.ID, s.AppConfig.FrontendURL)
-	c.Redirect(http.StatusTemporaryRedirect, s.AppConfig.FrontendURL) // Redirect to the main page or dashboard
 }
 
 // fetchGoogleUserInfo uses the OAuth token to get user details from Google.
 func (s *GoogleOAuthService) fetchGoogleUserInfo(token *oauth2.Token) (*models.GoogleUser, error) {
-	client := s.Config.Client(context.Background(), token)
+	client := s.OAuthConfig.Client(context.Background(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo") // v3 endpoint
 	if err != nil {
 		return nil, fmt.Errorf("failed to request user info: %w", err)
@@ -270,11 +101,175 @@ func (s *GoogleOAuthService) fetchGoogleUserInfo(token *oauth2.Token) (*models.G
 	return &googleUser, nil
 }
 
+// HandleLogin initiates the Google OAuth process by redirecting the user.
+func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
+	state, err := generateState()
+	if err != nil {
+		log.Printf("Error generating OAuth state: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to initiate login"})
+		return
+	}
+
+	isCookieSecure := s.Config.Environment == config.ProdEnvironment
+
+	// Store the state in a secure, HttpOnly cookie
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     jwt.StateCookie,
+		Value:    state,
+		HttpOnly: true,
+		Secure:   isCookieSecure,                     // Use Secure in prod/staging
+		Path:     "/",                                // Accessible across the domain
+		MaxAge:   int(5 * time.Minute / time.Second), // 5 minutes validity for the state
+		SameSite: http.SameSiteLaxMode,               // Good default for OAuth redirects
+	})
+
+	// Redirect user to Google's consent page
+	url := s.OAuthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline) // Request refresh token if needed later
+	c.Redirect(http.StatusTemporaryRedirect, url)
+}
+
+// HandleCallback handles the callback from Google after user authorization.
+func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
+	// 1. Verify State
+	storedState, err := c.Cookie(jwt.StateCookie)
+	if err != nil {
+		cookies := c.Request.Cookies()
+		log.Printf("Cookies Found: %v", cookies)
+		log.Printf("OAuth Callback Error: State cookie not found: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid callback state when logging in. Please try logging in again."})
+		return
+	}
+	// Clear the state cookie once used
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:   jwt.StateCookie,
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1, // Delete cookie
+	})
+
+	queryState := c.Query("state")
+	if queryState == "" || queryState != storedState {
+		log.Printf("OAuth Callback Error: Invalid state parameter. Expected '%s', got '%s'", storedState, queryState)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OAuth state."})
+		return
+	}
+
+	// 2. Handle Potential Errors from Google
+	errorParam := c.Query("error")
+	if errorParam != "" {
+		errorDesc := c.Query("error_description")
+		log.Printf("OAuth Callback Error from Google: %s - %s", errorParam, errorDesc)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: " + errorParam})
+		// Optionally redirect to a frontend error page
+		// c.Redirect(http.StatusTemporaryRedirect, s.AppConfig.FrontendURL+"/login?error="+errorParam)
+		return
+	}
+
+	// 3. Exchange Code for Token
+	code := c.Query("code")
+	if code == "" {
+		log.Println("OAuth Callback Error: No code parameter in the request.")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Authorization code missing."})
+		return
+	}
+
+	token, err := s.OAuthConfig.Exchange(context.Background(), code)
+	if err != nil {
+		log.Printf("OAuth Callback Error: Failed to exchange code for token: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process login."})
+		return
+	}
+	// Note: You might want to store token.RefreshToken securely if you need offline access later.
+
+	googleUser, err := s.fetchGoogleUserInfo(token)
+	if err != nil {
+		log.Printf("OAuth Callback Error: Failed to get user info from Google: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user information."})
+		return
+	}
+
+	// --- Added Logging ---
+	log.Printf("------------------------------------------")
+	log.Printf("OAuth Callback: Fetched Google User Info:")
+	log.Printf("  ID (sub):      %s", googleUser.ID)
+	log.Printf("  Email:         %s", googleUser.Email)
+	log.Printf("  Verified:      %t", googleUser.VerifiedEmail)
+	log.Printf("  Name:          %s", googleUser.Name)
+	log.Printf("  Picture URL:   %s", googleUser.Picture)
+	log.Printf("------------------------------------------")
+	// --- End Added Logging ---
+
+	// 5. Find or Create User in DB
+	user, err := s.DB.FindOrCreateUserByGoogleID(c.Request.Context(), googleUser)
+	if err != nil {
+		log.Printf("OAuth Callback Error: Database operation failed: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save user data."})
+		return
+	}
+
+	// --- Added Logging ---
+	log.Printf("------------------------------------------")
+	log.Printf("OAuth Callback: Found/Created Internal User:")
+	log.Printf("  User ID:       %s", user.ID)
+	log.Printf("  Email:         %s", user.Email)
+	log.Printf("  Name:          %s", user.Name)
+	log.Printf("  Auth Provider: %s", user.AuthProvider)
+	log.Printf("  Created At:    %s", user.CreatedAt.String()) // Convert time to string
+	log.Printf("------------------------------------------")
+	// --- End Added Logging ---
+
+	// 6. Generate JWT tokens (access + refresh)
+	accessToken, err := s.JWTService.GenerateToken(user)
+	if err != nil {
+		log.Printf("OAuth Callback Error: Failed to generate access token: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete login."})
+		return
+	}
+
+	refreshToken, err := s.JWTService.GenerateRefreshToken(user)
+	if err != nil {
+		log.Printf("OAuth Callback Error: Failed to generate refresh token: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete login."})
+		return
+	}
+
+	isCookieSecure := s.Config.Environment == config.ProdEnvironment
+
+	// Set access token cookie
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     jwt.AuthTokenCookie,
+		Value:    accessToken,
+		HttpOnly: true,
+		Secure:   isCookieSecure,
+		Path:     "/",
+		MaxAge:   int(s.Config.TokenDuration / time.Second),
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Set refresh token cookie with longer expiration
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     jwt.RefreshTokenCookie,
+		Value:    refreshToken,
+		HttpOnly: true,
+		Secure:   isCookieSecure,
+		Path:     "/",
+		MaxAge:   int(s.Config.TokenDuration * 7 / time.Second), // 7x longer
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// --- Added Logging ---
+	log.Printf("OAuth Callback: Set auth_token cookie successfully for user %s.", user.ID)
+
+	// 8. Redirect to Frontend
+	log.Printf("OAuth successful for user %s (%s). Redirecting to frontend: %s", user.Email, user.ID, s.Config.FrontendURL)
+	c.Redirect(http.StatusTemporaryRedirect, s.Config.FrontendURL) // Redirect to the main page or dashboard
+}
+
 // HandleLogout clears the authentication cookies and blacklists the token.
 func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
 	// Get current tokens from cookies
-	accessToken, _ := c.Cookie("auth_token")
-	refreshToken, _ := c.Cookie("refresh_token")
+	accessToken, _ := c.Cookie(jwt.AuthTokenCookie)
+	refreshToken, _ := c.Cookie(jwt.RefreshTokenCookie)
 
 	// Blacklist tokens if they exist
 	if accessToken != "" {
@@ -289,25 +284,27 @@ func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
 		}
 	}
 
+	isCookieSecure := s.Config.Environment == config.ProdEnvironment
+
 	// Clear the auth_token cookie
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "auth_token",
+		Name:     jwt.AuthTokenCookie,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1, // Delete cookie now
 		HttpOnly: true,
-		Secure:   s.AppConfig.Environment != "development",
+		Secure:   isCookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 
 	// Clear the refresh_token cookie
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "refresh_token",
+		Name:     jwt.RefreshTokenCookie,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1, // Delete cookie now
 		HttpOnly: true,
-		Secure:   s.AppConfig.Environment != "development",
+		Secure:   isCookieSecure,
 		SameSite: http.SameSiteLaxMode,
 	})
 
@@ -320,26 +317,17 @@ func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
 }
 
 // HandleRefreshToken processes token refresh requests
-// In production, this endpoint only accepts refresh tokens from cookies.
-// For development/testing, it can fall back to Authorization header.
+// only accepts refresh tokens from cookies.
 func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 	// Get refresh token from cookie
-	refreshToken, err := c.Cookie("refresh_token")
-
-	// Dev-only fallback: check Authorization header
-	if err != nil && s.AppConfig.Environment == "development" {
-		// This fallback is for development/testing only
-		authHeader := c.GetHeader("Authorization")
-		if strings.HasPrefix(authHeader, "Bearer ") {
-			refreshToken = strings.TrimPrefix(authHeader, "Bearer ")
-			log.Printf("DEV MODE: Using refresh token from Authorization header")
-		}
-	}
+	refreshToken, err := c.Cookie(jwt.RefreshTokenCookie)
 
 	if refreshToken == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token not provided"})
 		return
 	}
+
+	isCookieSecure := s.Config.Environment == config.ProdEnvironment
 
 	// Validate refresh token
 	claims, err := s.JWTService.ValidateRefreshToken(refreshToken)
@@ -348,12 +336,12 @@ func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 
 		// Clear the invalid refresh token cookie
 		http.SetCookie(c.Writer, &http.Cookie{
-			Name:     "refresh_token",
+			Name:     jwt.RefreshTokenCookie,
 			Value:    "",
 			Path:     "/",
 			MaxAge:   -1,
 			HttpOnly: true,
-			Secure:   s.AppConfig.Environment != "development",
+			Secure:   isCookieSecure,
 			SameSite: http.SameSiteLaxMode,
 		})
 
@@ -363,7 +351,7 @@ func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 
 	// Get the user from database to ensure it still exists
 	ctx := c.Request.Context()
-	user, err := s.UserStore.GetUserByID(ctx, claims.UserID)
+	user, err := s.DB.GetUserByID(ctx, claims.UserID)
 	if err != nil {
 		log.Printf("Error fetching user during token refresh: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
@@ -380,23 +368,17 @@ func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 
 	// Set the new access token cookie
 	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     "auth_token",
+		Name:     jwt.AuthTokenCookie,
 		Value:    newAccessToken,
 		HttpOnly: true,
-		Secure:   s.AppConfig.Environment != "development",
+		Secure:   isCookieSecure,
 		Path:     "/",
-		MaxAge:   int(s.AppConfig.TokenDuration / time.Second),
+		MaxAge:   int(s.Config.TokenDuration / time.Second),
 		SameSite: http.SameSiteLaxMode,
 	})
 
 	// Response with success message
 	response := gin.H{"message": "Token refreshed successfully"}
-
-	// Dev-only: Include token in response body for easier testing
-	if s.AppConfig.Environment == "development" {
-		response["token"] = newAccessToken
-		log.Printf("DEV MODE: Including token in refresh response")
-	}
 
 	c.JSON(http.StatusOK, response)
 }
