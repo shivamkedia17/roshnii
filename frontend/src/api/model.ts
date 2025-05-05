@@ -39,3 +39,7 @@ export type AlbumImage = {
   album_id: AlbumID;
   image_id: ImageID;
 };
+
+export type ServerMessage = {
+  message: string;
+};

@@ -72,10 +72,14 @@ func GetUserClaims(c *gin.Context) *jwt.Claims {
 	if !exists {
 		return nil
 	}
+	log.Printf("Claim Exist: %v", claims)
+
 	userClaims, ok := claims.(*jwt.Claims)
 	if !ok {
 		return nil
 	}
+
+	log.Printf("Claim Found: %v", userClaims)
 	return userClaims
 }
 

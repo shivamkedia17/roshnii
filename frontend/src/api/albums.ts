@@ -4,106 +4,106 @@ import { Album, ImageMetadata } from "./model";
 export const AlbumsAPI = {
   baseEndpoint: "/albums",
 
-  listAlbums: function () {
+  listAlbums: async function () {
     const params: EndpointParams = {
       endpoint: this.baseEndpoint,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "GET",
       },
     };
 
-    return apiClient<Album[]>(params);
+    return await apiClient<Album[]>(params);
   },
 
-  createAlbum: function (name: string, description: string = "") {
+  createAlbum: async function (name: string, description: string = "") {
     const params: EndpointParams = {
       endpoint: this.baseEndpoint,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "POST",
         body: JSON.stringify({ name, description }),
       },
     };
 
-    return apiClient<Album>(params);
+    return await apiClient<Album>(params);
   },
 
-  getAlbum: function (albumId: string) {
+  getAlbum: async function (albumId: string) {
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/${albumId}`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "GET",
       },
     };
 
-    return apiClient<Album>(params);
+    return await apiClient<Album>(params);
   },
 
-  updateAlbum: function (
+  updateAlbum: async function (
     albumId: string,
     name: string,
     description: string = "",
   ) {
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/${albumId}`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "PUT",
         body: JSON.stringify({ name, description }),
       },
     };
 
-    return apiClient<{ message: string }>(params);
+    return await apiClient<{ message: string }>(params);
   },
 
-  deleteAlbum: function (albumId: string) {
+  deleteAlbum: async function (albumId: string) {
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/${albumId}`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "DELETE",
       },
     };
 
-    return apiClient<{ message: string }>(params);
+    return await apiClient<{ message: string }>(params);
   },
 
-  getAlbumImages: function (albumId: string) {
+  getAlbumImages: async function (albumId: string) {
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/${albumId}/images`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "GET",
       },
     };
 
-    return apiClient<ImageMetadata[]>(params);
+    return await apiClient<ImageMetadata[]>(params);
   },
 
-  addAlbumImage: function (albumId: string, imageId: string) {
+  addAlbumImage: async function (albumId: string, imageId: string) {
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/${albumId}/images`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "POST",
         body: JSON.stringify({ image_id: imageId }),
       },
     };
 
-    return apiClient<{ message: string }>(params);
+    return await apiClient<{ message: string }>(params);
   },
 
-  deleteAlbumImage: function (albumId: string, imageId: string) {
+  deleteAlbumImage: async function (albumId: string, imageId: string) {
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/${albumId}/images/${imageId}`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "DELETE",
       },
     };
 
-    return apiClient<{ message: string }>(params);
+    return await apiClient<{ message: string }>(params);
   },
 };

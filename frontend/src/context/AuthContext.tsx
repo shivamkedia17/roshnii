@@ -1,114 +1,54 @@
-import {
-  createContext,
-  useContext,
-  ReactNode,
-  useCallback,
-  useEffect,
-} from "react";
-import {
-  useCurrentUser,
-  useRefreshToken,
-  useLogout,
-  authKeys,
-} from "@/hooks/useAuthQueries";
-import { AuthContextType, UserInfo } from "@/types";
-import { useQueryClient } from "@tanstack/react-query";
+import { User } from "@/api/model";
+import { useCurrentUser, useLogin, useLogout } from "@/hooks/useAuth";
+import { createContext, ReactNode, useContext, useState } from "react";
 
-export const AuthContext = createContext<AuthContextType>({
-  isAuthenticated: false,
-  isLoading: true,
-  user: null,
-  login: () => {},
-  logout: async () => true,
-  refreshToken: async () => false,
-});
+type AuthContextProps = {
+  children: ReactNode;
+};
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const { data: user, isLoading, error: userError, isError } = useCurrentUser();
-  const refreshMutation = useRefreshToken();
+type AuthContextType = {
+  user?: User;
+  isAuthenticated: boolean;
+  setIsAuthenticated: React.Dispatch<React.SetStateAction<boolean>>;
+  isLoading: boolean;
+  error: Error | null;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
+};
+
+const AuthContext = createContext<AuthContextType | null>(null);
+
+export function AuthProvider({ children }: AuthContextProps) {
+  // Use the TanStack Query hooks
+
+  const loginMutation = useLogin();
   const logoutMutation = useLogout();
-  const queryClient = useQueryClient();
 
-  // Function to refresh token
-  const refreshToken = useCallback(async (): Promise<boolean> => {
-    try {
-      // Don't attempt refresh if we've explicitly logged out
-      if (
-        isError &&
-        userError instanceof Error &&
-        userError.message.includes("logged out")
-      ) {
-        return false;
-      }
+  // Helper functions to expose mutations more cleanly
+  const login = async () => {
+    await loginMutation.mutateAsync();
+  };
 
-      await refreshMutation.mutateAsync();
-      return true;
-    } catch (error) {
-      console.error("Token refresh error:", error);
-      return false;
-    }
-  }, [refreshMutation, isError, userError]);
+  const logout = async () => {
+    await logoutMutation.mutateAsync();
+  };
 
-  // Listen for session expired events
-  useEffect(() => {
-    const handleSessionExpired = () => {
-      refreshToken().catch((err) => {
-        console.error("Auto-refresh failed:", err);
-      });
-    };
-
-    window.addEventListener("auth:sessionExpired", handleSessionExpired);
-    return () => {
-      window.removeEventListener("auth:sessionExpired", handleSessionExpired);
-    };
-  }, [refreshToken]);
-
-  // Setup automatic refresh
-  useEffect(() => {
-    // If auth error is due to expired token, try to refresh
-    if (
-      isError &&
-      userError instanceof Error &&
-      userError.message.includes("expired")
-    ) {
-      refreshToken().catch((err) => {
-        console.error("Auto-refresh failed:", err);
-      });
-    }
-  }, [isError, userError, refreshToken]);
-
-  // Redirect to Google login
-  const login = useCallback(() => {
-    window.location.href = "/api/auth/google/login";
-  }, []);
-
-  // Function to handle logout
-  const logout = useCallback(async () => {
-    try {
-      // First set authentication state to logged out to prevent refresh attempts
-      // This prevents the infinite loop
-      queryClient.setQueryData(authKeys.currentUser(), null);
-
-      // Then perform the actual logout API call
-      return await logoutMutation.mutateAsync();
-    } catch (error) {
-      console.error("Logout error:", error);
-      return false;
-    }
-  }, [queryClient, logoutMutation]);
-
-  // Determine authentication status
-  const isAuthenticated = !!user && !isError;
+  const { data: user, isLoading, error } = useCurrentUser();
+  const [isAuthenticated, setIsAuthenticated] = useState(!!user);
+  console.log(user);
+  console.log(isAuthenticated);
+  // Determine if the user is authenticated
 
   return (
     <AuthContext.Provider
       value={{
+        user,
         isAuthenticated,
+        setIsAuthenticated,
+        error,
         isLoading,
-        user: user as UserInfo | null,
         login,
         logout,
-        refreshToken,
       }}
     >
       {children}
@@ -116,12 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export const useAuth = () => {
+export function useAuthContext() {
   const context = useContext(AuthContext);
-
   if (!context) {
-    throw new Error("useAuth must be used within an AuthContextProvider");
+    throw new Error(
+      "useAuthContext must be used within an AuthProvider component.",
+    );
   }
 
   return context;
-};
+}

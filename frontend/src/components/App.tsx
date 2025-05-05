@@ -1,19 +1,22 @@
-import { ErrorBoundary } from "./common/ErrorBoundary";
-import { useAuth } from "../context/AuthContext";
-import { Login } from "./auth/Login";
-import { MainLayout } from "./layout/MainLayout";
+import { useAuthContext } from "@/context/AuthContext";
 import "@/css/App.css";
+import { Loading } from "./common/Loading";
 
 export default function App() {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <div className="loading">Loading...</div>;
-  }
+  const { isAuthenticated, isLoading, login, logout } = useAuthContext();
 
   return (
-    <ErrorBoundary>
-      {isAuthenticated ? <MainLayout /> : <Login />}
-    </ErrorBoundary>
+    <>
+      {isLoading ? (
+        <Loading />
+      ) : isAuthenticated ? (
+        <div>
+          <h1>Logged In!</h1>
+          <button onClick={logout}>Log Out</button>
+        </div>
+      ) : (
+        <button onClick={login}>Login With Google</button>
+      )}
+    </>
   );
 }

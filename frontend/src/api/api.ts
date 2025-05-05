@@ -1,17 +1,21 @@
+import { useAuthContext } from "@/context/AuthContext";
+import { AuthAPI } from "./auth";
+import { ServerMessage } from "./model";
+
 export const API_URL = "/api";
 
 export type EndpointParams = {
   endpoint: string;
   options: RequestInit;
-  requiresAuth?: boolean;
+  includeCookies?: boolean;
 };
 
 // Simplified API client that relies solely on cookies for authentication
 export async function apiClient<T>({
   endpoint = "",
   options = {},
-  requiresAuth = undefined,
-}: EndpointParams): Promise<T> {
+  includeCookies = undefined,
+}: EndpointParams): Promise<T | undefined> {
   const url = `${API_URL}${endpoint}`;
 
   const fetchOptions: RequestInit = {
@@ -22,7 +26,7 @@ export async function apiClient<T>({
         ? {}
         : { "Content-Type": "application/json" }),
     },
-    credentials: requiresAuth ? "include" : "omit",
+    credentials: includeCookies ? "include" : "omit",
   };
 
   try {
@@ -30,22 +34,28 @@ export async function apiClient<T>({
 
     // If response is successful, return the data
     if (response.ok) {
-      return response.json();
+      console.log(response.json());
+      return (await response.json()) as T;
     }
 
-    // For 401 Unauthorized, redirect to login if session expired
+    // For 401 Unauthorized, redirect to login if unauthorized after trying to refresh JWT
     if (response.status === 401) {
-      // TODO  - handle 401
-      // maybe refresh the token if appropriate
-      //
-      // or redirect to login endpoint
-      //
-      // window.dispatchEvent(new CustomEvent("auth:sessionExpired"));
-      // You could also redirect to login page directly if appropriate
-      // window.location.href = '/api/auth/google/login';
-    }
+      const body = (await response.json()) as ServerMessage;
 
-    return (await response.json()) as T;
+      // messages copied from backend
+      if (body.message.includes("please refresh your token")) {
+        // try refreshing the token
+        const attempt = await AuthAPI.refreshToken();
+        if (!attempt || attempt.message != "Token refreshed successfully") {
+          const { setIsAuthenticated } = useAuthContext();
+          setIsAuthenticated(false);
+        }
+      }
+
+      // or redirect to login endpoint
+      const { setIsAuthenticated } = useAuthContext();
+      setIsAuthenticated(false);
+    }
   } catch (error) {
     console.error(`API request failed for ${url}:`, error);
     throw error;

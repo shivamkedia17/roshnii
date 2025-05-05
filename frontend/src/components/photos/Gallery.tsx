@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PhotoItem } from "./PhotoItem";
 import { PhotoModal } from "./PhotoModal";
-import { usePhotos } from "@/hooks/usePhotoQueries";
+import { useImages } from "@/hooks/useImageQueries";
 import "@/css/Gallery.css";
 
 export type GalleryProps = {
@@ -19,7 +19,7 @@ export function Gallery({
     isLoading,
     error,
     refetch,
-  } = usePhotos({ searchQuery, albumId });
+  } = useImages({ searchQuery, albumId });
 
   // Handler for retrying if there's an error
   const handleRetry = () => {

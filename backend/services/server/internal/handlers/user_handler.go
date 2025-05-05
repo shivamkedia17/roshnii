@@ -24,10 +24,6 @@ func NewUserHandler(config *config.Config, db db.UserStore) *UserHandler {
 	}
 }
 
-// RegisterRoutes connects user routes to the Gin engine
-func (h *UserHandler) RegisterRoutes(router *gin.RouterGroup, authMiddleware gin.HandlerFunc) {
-}
-
 // GetCurrentUser returns the authenticated user's profile
 func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	userID := middleware.GetUserID(c)
@@ -43,14 +39,8 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	// Return user information (excluding sensitive fields)
-	c.JSON(http.StatusOK, gin.H{
-		"user_id":     user.ID,
-		"email":       user.Email,
-		"name":        user.Name,
-		"picture_url": user.PictureURL,
-		"created_at":  user.CreatedAt,
-	})
+	// Return the entire user struct as is
+	c.JSON(http.StatusOK, user)
 }
 
 // Example of additional method (optional)

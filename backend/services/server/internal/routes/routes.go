@@ -15,7 +15,7 @@ func RegisterAuthRoutes(routerGroup *gin.RouterGroup, authMiddleware gin.Handler
 		googleRoutes.GET("/login", h.HandleLogin)
 		googleRoutes.GET("/callback", h.HandleCallback)
 		googleRoutes.POST("/refresh", h.HandleRefreshToken)
-		googleRoutes.POST("/logout", authMiddleware, h.HandleLogout) // Apply handlers middleware here
+		googleRoutes.POST("/logout", authMiddleware, h.HandleLogout)
 	}
 }
 
@@ -84,9 +84,24 @@ func SetupRouter(cfg *config.Config, handlers *handlers.Handlers, authMiddleware
 	// c. Setup CORS (Cross Origin Resource Sharing)
 	corsConfig := cors.DefaultConfig()
 
+	// Set allowed origins from configuration
 	// FIXME change hardcoded server address to cfg based dynamic address
-	corsConfig.AllowOrigins = []string{frontEndURL, "http://localhost:8080"}
+	corsConfig.AllowOrigins = []string{frontEndURL, "http://localhost:8080", "http://localhost:5173"}
+
+	// Enable credentials for cookies
 	corsConfig.AllowCredentials = true
+
+	// Allow common methods
+	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+
+	// Allow common headers
+	corsConfig.AllowHeaders = []string{
+		"Origin", "Content-Type", "Accept", "Authorization",
+		"X-Requested-With", "X-CSRF-Token", "Access-Control-Allow-Origin",
+	}
+
+	// Add Access-Control-Expose-Headers to expose custom headers to the frontend
+	corsConfig.ExposeHeaders = []string{"Content-Length", "Content-Type"}
 
 	router.Use(cors.New(corsConfig))
 

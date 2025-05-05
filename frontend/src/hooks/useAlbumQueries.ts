@@ -1,114 +1,123 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { albumsAPI } from "@/api/albums";
-import { CreateAlbumRequest, UpdateAlbumRequest } from "@/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AlbumsAPI } from "@/api/albums";
 
 // Query keys
-export const albumKeys = {
+export const albumsAPIQueryKeys = {
   all: ["albums"] as const,
-  lists: () => [...albumKeys.all, "list"] as const,
-  list: () => [...albumKeys.lists()] as const,
-  details: () => [...albumKeys.all, "detail"] as const,
-  detail: (id: number) => [...albumKeys.details(), id] as const,
-  images: () => [...albumKeys.all, "images"] as const,
-  albumImages: (id: number) => [...albumKeys.images(), id] as const,
+  lists: () => [...albumsAPIQueryKeys.all, "list"] as const,
+  list: (filters: string) =>
+    [...albumsAPIQueryKeys.lists(), { filters }] as const,
+  details: () => [...albumsAPIQueryKeys.all, "detail"] as const,
+  detail: (id: string) => [...albumsAPIQueryKeys.details(), id] as const,
+  images: (id: string) => [...albumsAPIQueryKeys.detail(id), "images"] as const,
 };
 
-// Get all albums hook
+// Hooks for data fetching
 export function useAlbums() {
   return useQuery({
-    queryKey: albumKeys.list(),
-    queryFn: albumsAPI.getAlbums,
+    queryKey: albumsAPIQueryKeys.lists(),
+    queryFn: () => AlbumsAPI.listAlbums(),
   });
 }
 
-// Get single album hook
-export function useAlbum(id: number | null) {
+export function useAlbum(albumId: string) {
   return useQuery({
-    queryKey: albumKeys.detail(id || 0),
-    queryFn: () => albumsAPI.getAlbum(id || 0),
-    enabled: !!id, // Only run the query if we have an ID
+    queryKey: albumsAPIQueryKeys.detail(albumId),
+    queryFn: () => AlbumsAPI.getAlbum(albumId),
+    enabled: !!albumId,
   });
 }
 
-// Get album images hook
-export function useAlbumImages(albumId: number | null) {
+export function useAlbumImages(albumId: string) {
   return useQuery({
-    queryKey: albumKeys.albumImages(albumId || 0),
-    queryFn: () => albumsAPI.getAlbumImages(albumId || 0),
-    enabled: !!albumId, // Only run the query if we have an ID
+    queryKey: albumsAPIQueryKeys.images(albumId),
+    queryFn: () => AlbumsAPI.getAlbumImages(albumId),
+    enabled: !!albumId,
   });
 }
 
-// Create album hook
+// Hooks for mutations
 export function useCreateAlbum() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreateAlbumRequest) => albumsAPI.createAlbum(data),
+    mutationFn: ({
+      name,
+      description,
+    }: {
+      name: string;
+      description: string;
+    }) => AlbumsAPI.createAlbum(name, description),
     onSuccess: () => {
-      // Invalidate albums list to refresh it
-      queryClient.invalidateQueries({ queryKey: albumKeys.lists() });
+      // Invalidate the albums list cache to trigger a refetch
+      queryClient.invalidateQueries({ queryKey: albumsAPIQueryKeys.lists() });
     },
   });
 }
 
-// Update album hook
 export function useUpdateAlbum() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateAlbumRequest }) =>
-      albumsAPI.updateAlbum(id, data),
+    mutationFn: ({
+      albumId,
+      name,
+      description,
+    }: {
+      albumId: string;
+      name: string;
+      description: string;
+    }) => AlbumsAPI.updateAlbum(albumId, name, description),
     onSuccess: (_, variables) => {
-      // Invalidate specific album and the albums list
+      // Invalidate the specific album cache and the albums list
       queryClient.invalidateQueries({
-        queryKey: albumKeys.detail(variables.id),
+        queryKey: albumsAPIQueryKeys.detail(variables.albumId),
       });
-      queryClient.invalidateQueries({ queryKey: albumKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: albumsAPIQueryKeys.lists() });
     },
   });
 }
 
-// Delete album hook
 export function useDeleteAlbum() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => albumsAPI.deleteAlbum(id),
-    onSuccess: () => {
-      // Invalidate albums list
-      queryClient.invalidateQueries({ queryKey: albumKeys.lists() });
+    mutationFn: (albumId: string) => AlbumsAPI.deleteAlbum(albumId),
+    onSuccess: (_, albumId) => {
+      // Remove the album from cache and invalidate the albums list
+      queryClient.removeQueries({
+        queryKey: albumsAPIQueryKeys.detail(albumId),
+      });
+      queryClient.invalidateQueries({ queryKey: albumsAPIQueryKeys.lists() });
     },
   });
 }
 
-// Add image to album hook
 export function useAddImageToAlbum() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ albumId, imageId }: { albumId: number; imageId: string }) =>
-      albumsAPI.addImageToAlbum(albumId, imageId),
+    mutationFn: ({ albumId, imageId }: { albumId: string; imageId: string }) =>
+      AlbumsAPI.addAlbumImage(albumId, imageId),
     onSuccess: (_, variables) => {
-      // Invalidate album images list
+      // Invalidate the album images cache
       queryClient.invalidateQueries({
-        queryKey: albumKeys.albumImages(variables.albumId),
+        queryKey: albumsAPIQueryKeys.images(variables.albumId),
       });
     },
   });
 }
 
-// Remove image from album hook
 export function useRemoveImageFromAlbum() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ albumId, imageId }: { albumId: number; imageId: string }) =>
-      albumsAPI.removeImageFromAlbum(albumId, imageId),
+    mutationFn: ({ albumId, imageId }: { albumId: string; imageId: string }) =>
+      AlbumsAPI.deleteAlbumImage(albumId, imageId),
     onSuccess: (_, variables) => {
-      // Invalidate album images list
+      // Invalidate the album images cache
       queryClient.invalidateQueries({
-        queryKey: albumKeys.albumImages(variables.albumId),
+        queryKey: albumsAPIQueryKeys.images(variables.albumId),
       });
     },
   });

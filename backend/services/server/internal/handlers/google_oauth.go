@@ -43,7 +43,14 @@ type GoogleOAuthService struct {
 func NewGoogleOAuthService(cfg *config.Config, userStore db.UserStore, jwtService jwt.JWTService) *GoogleOAuthService {
 
 	// redirectURL := fmt.Sprintf("http://%s:%s/api/auth/google/callback", cfg.ServerHost, cfg.ServerPort)
+
+	//  don't redirect to the backend?
 	redirectURL := fmt.Sprintf("http://%s:%s/api/auth/google/callback", cfg.PublicHost, cfg.PublicPort)
+
+	// FIXME hardcoded frontend address
+	// redirectURL := "http://localhost:5173"
+
+	// CORRECT: redirect to the frontend instead
 	log.Printf("Using Google OAuth Redirect URL: %s", redirectURL)
 
 	return &GoogleOAuthService{
@@ -123,43 +130,51 @@ func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
 		SameSite: http.SameSiteLaxMode,               // Good default for OAuth redirects
 	})
 
-	// Redirect user to Google's consent page
-	url := s.OAuthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline) // Request refresh token if needed later
-	c.Redirect(http.StatusTemporaryRedirect, url)
+	// Refresh Token is NOT fetched from ID provider. Ask the user to reauthenticate when expires.
+	authConsentURL := s.OAuthConfig.AuthCodeURL(state, oauth2.AccessTypeOnline)
+
+	// WARNING: Don't Redirect user to Google's consent page
+	// c.Redirect(http.StatusTemporaryRedirect, authConsentURL)
+
+	// Instead of redirecting, return the URL to the frontend
+	c.JSON(http.StatusOK, gin.H{
+		"auth_url": authConsentURL,
+	})
 }
 
 // HandleCallback handles the callback from Google after user authorization.
 func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
-	// 1. Verify State
-	storedState, err := c.Cookie(jwt.StateCookie)
-	if err != nil {
-		cookies := c.Request.Cookies()
-		log.Printf("Cookies Found: %v", cookies)
-		log.Printf("OAuth Callback Error: State cookie not found: %v", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid callback state when logging in. Please try logging in again."})
-		return
-	}
-	// Clear the state cookie once used
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:   jwt.StateCookie,
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1, // Delete cookie
-	})
+	// // 1. Verify State
+	// storedState, err := c.Cookie(jwt.StateCookie)
+	// if err != nil {
+	cookies := c.Request.Cookies()
+	log.Printf("Cookies Found: %v", cookies)
+	// 	log.Printf("OAuth Callback Error: State cookie not found: %v", err)
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid callback state when logging in. Please try logging in again."})
+	// 	return
+	// }
 
-	queryState := c.Query("state")
-	if queryState == "" || queryState != storedState {
-		log.Printf("OAuth Callback Error: Invalid state parameter. Expected '%s', got '%s'", storedState, queryState)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid OAuth state."})
-		return
-	}
+	// // Clear the state cookie once used
+	// http.SetCookie(c.Writer, &http.Cookie{
+	// 	Name:   jwt.StateCookie,
+	// 	Value:  "",
+	// 	Path:   "/",
+	// 	MaxAge: -1, // Delete cookie
+	// })
+
+	// queryState := c.Query("state")
+	// if queryState == "" || queryState != storedState {
+	// 	log.Printf("OAuth Callback Error: Invalid state parameter. Expected '%s', got '%s'", storedState, queryState)
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid OAuth state."})
+	// 	return
+	// }
 
 	// 2. Handle Potential Errors from Google
 	errorParam := c.Query("error")
 	if errorParam != "" {
 		errorDesc := c.Query("error_description")
 		log.Printf("OAuth Callback Error from Google: %s - %s", errorParam, errorDesc)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization failed: " + errorParam})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Authorization failed: " + errorParam})
 		// Optionally redirect to a frontend error page
 		// c.Redirect(http.StatusTemporaryRedirect, s.AppConfig.FrontendURL+"/login?error="+errorParam)
 		return
@@ -179,7 +194,6 @@ func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process login."})
 		return
 	}
-	// Note: You might want to store token.RefreshToken securely if you need offline access later.
 
 	googleUser, err := s.fetchGoogleUserInfo(token)
 	if err != nil {

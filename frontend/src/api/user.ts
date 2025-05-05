@@ -1,18 +1,19 @@
-import { apiClient } from "./api";
+import { apiClient, EndpointParams } from "./api";
 import { User } from "./model";
 
 export const UserAPI = {
-  baseEndpoint: "/me",
+  baseEndpoint: `/me`,
 
-  getCurrentUser: function () {
-    const params = {
+  getCurrentUser: async function () {
+    const params: EndpointParams = {
       endpoint: this.baseEndpoint,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "GET",
       },
     };
 
-    return apiClient<User>(params);
+    const user: User = await apiClient<User>(params);
+    return user;
   },
 };

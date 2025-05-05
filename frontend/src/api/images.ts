@@ -4,60 +4,73 @@ import { ImageMetadata } from "./model";
 export const ImagesAPI = {
   baseEndpoint: "/images",
 
-  listImages: function () {
+  listImages: async function () {
     const params: EndpointParams = {
       endpoint: this.baseEndpoint,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "GET",
       },
     };
 
-    return apiClient<ImageMetadata[]>(params);
+    return await apiClient<ImageMetadata[]>(params);
   },
 
-  uploadImage: function (file: File) {
+  uploadImage: async function (file: File) {
     // check if correct headers are being set
     const formData = new FormData();
     formData.append("file", file);
 
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/upload`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "POST",
         body: formData,
       },
     };
 
-    return apiClient<ImageMetadata>(params);
+    return await apiClient<ImageMetadata>(params);
   },
 
-  getImageMetadata: function (imageId: string) {
+  getImageMetadata: async function (imageId: string) {
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/${imageId}`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "GET",
       },
     };
 
-    return apiClient<ImageMetadata>(params);
+    return await apiClient<ImageMetadata>(params);
   },
 
-  deleteImage: function (imageId: string) {
+  deleteImage: async function (imageId: string) {
     const params: EndpointParams = {
       endpoint: `${this.baseEndpoint}/${imageId}`,
-      requiresAuth: true,
+      includeCookies: true,
       options: {
         method: "DELETE",
       },
     };
 
-    return apiClient<{ message: string }>(params);
+    return await apiClient<{ message: string }>(params);
   },
 
-  getImageURL: function (imageId: string) {
-    return `/api${this.baseEndpoint}/${imageId}/download`;
+  loadImage: async function (imageId: string) {
+    const url = `/api${this.baseEndpoint}/${imageId}/download`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to load image: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return await response.blob();
   },
 };
