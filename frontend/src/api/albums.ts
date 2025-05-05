@@ -1,52 +1,109 @@
-import { apiClient } from "./api";
-import {
-  AlbumInfo,
-  CreateAlbumRequest,
-  UpdateAlbumRequest,
-  PhotoInfo,
-} from "@/types";
+import { apiClient, EndpointParams } from "./api";
+import { Album, ImageMetadata } from "./model";
 
-export const albumsAPI = {
-  // Get all albums
-  getAlbums: () => apiClient<AlbumInfo[]>("/albums"),
+export const AlbumsAPI = {
+  baseEndpoint: "/albums",
 
-  // Get a single album
-  getAlbum: (id: number) => apiClient<AlbumInfo>(`/albums/${id}`),
+  listAlbums: function () {
+    const params: EndpointParams = {
+      endpoint: this.baseEndpoint,
+      requiresAuth: true,
+      options: {
+        method: "GET",
+      },
+    };
 
-  // Create a new album
-  createAlbum: (data: CreateAlbumRequest) =>
-    apiClient<AlbumInfo>("/albums", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    return apiClient<Album[]>(params);
+  },
 
-  // Update an album
-  updateAlbum: (id: number, data: UpdateAlbumRequest) =>
-    apiClient<{ message: string }>(`/albums/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+  createAlbum: function (name: string, description: string = "") {
+    const params: EndpointParams = {
+      endpoint: this.baseEndpoint,
+      requiresAuth: true,
+      options: {
+        method: "POST",
+        body: JSON.stringify({ name, description }),
+      },
+    };
 
-  // Delete an album
-  deleteAlbum: (id: number) =>
-    apiClient<{ message: string }>(`/albums/${id}`, {
-      method: "DELETE",
-    }),
+    return apiClient<Album>(params);
+  },
 
-  // Get images in an album
-  getAlbumImages: (id: number) =>
-    apiClient<PhotoInfo[]>(`/albums/${id}/images`),
+  getAlbum: function (albumId: string) {
+    const params: EndpointParams = {
+      endpoint: `${this.baseEndpoint}/${albumId}`,
+      requiresAuth: true,
+      options: {
+        method: "GET",
+      },
+    };
 
-  // Add image to album
-  addImageToAlbum: (albumId: number, imageId: string) =>
-    apiClient<{ message: string }>(`/albums/${albumId}/images`, {
-      method: "POST",
-      body: JSON.stringify({ image_id: imageId }),
-    }),
+    return apiClient<Album>(params);
+  },
 
-  // Remove image from album
-  removeImageFromAlbum: (albumId: number, imageId: string) =>
-    apiClient<{ message: string }>(`/albums/${albumId}/images/${imageId}`, {
-      method: "DELETE",
-    }),
+  updateAlbum: function (
+    albumId: string,
+    name: string,
+    description: string = "",
+  ) {
+    const params: EndpointParams = {
+      endpoint: `${this.baseEndpoint}/${albumId}`,
+      requiresAuth: true,
+      options: {
+        method: "PUT",
+        body: JSON.stringify({ name, description }),
+      },
+    };
+
+    return apiClient<{ message: string }>(params);
+  },
+
+  deleteAlbum: function (albumId: string) {
+    const params: EndpointParams = {
+      endpoint: `${this.baseEndpoint}/${albumId}`,
+      requiresAuth: true,
+      options: {
+        method: "DELETE",
+      },
+    };
+
+    return apiClient<{ message: string }>(params);
+  },
+
+  getAlbumImages: function (albumId: string) {
+    const params: EndpointParams = {
+      endpoint: `${this.baseEndpoint}/${albumId}/images`,
+      requiresAuth: true,
+      options: {
+        method: "GET",
+      },
+    };
+
+    return apiClient<ImageMetadata[]>(params);
+  },
+
+  addAlbumImage: function (albumId: string, imageId: string) {
+    const params: EndpointParams = {
+      endpoint: `${this.baseEndpoint}/${albumId}/images`,
+      requiresAuth: true,
+      options: {
+        method: "POST",
+        body: JSON.stringify({ image_id: imageId }),
+      },
+    };
+
+    return apiClient<{ message: string }>(params);
+  },
+
+  deleteAlbumImage: function (albumId: string, imageId: string) {
+    const params: EndpointParams = {
+      endpoint: `${this.baseEndpoint}/${albumId}/images/${imageId}`,
+      requiresAuth: true,
+      options: {
+        method: "DELETE",
+      },
+    };
+
+    return apiClient<{ message: string }>(params);
+  },
 };

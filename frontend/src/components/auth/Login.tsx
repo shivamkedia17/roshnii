@@ -1,14 +1,11 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { DevLogin } from "./DevLogin";
 import "@/css/Auth.css";
 
 export function Login() {
+  // TODO Refactor to use tanstack query if possible
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Check if in development mode
-  const isDev = import.meta.env.NODE_ENV === "development" || true; // For testing, default to true
 
   const { login } = useAuth();
 
@@ -23,10 +20,6 @@ export function Login() {
       setIsLoading(false);
     }
   };
-
-  if (isDev) {
-    return <DevLogin />;
-  }
 
   // Regular OAuth login for production
   return (

@@ -24,20 +24,6 @@ export function useCurrentUser() {
   });
 }
 
-// Dev login hook
-export function useDevLogin() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (credentials: { email: string; name: string }) =>
-      authAPI.devLogin(credentials),
-    onSuccess: () => {
-      // Invalidate current user query to refetch
-      queryClient.invalidateQueries({ queryKey: authKeys.currentUser() });
-    },
-  });
-}
-
 // Refresh token hook
 export function useRefreshToken() {
   const queryClient = useQueryClient();
@@ -52,30 +38,16 @@ export function useRefreshToken() {
 }
 
 // Logout hook
+// FIXME this clearly doesn't work properly
 export function useLogout() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      try {
-        // Reset auth state immediately to prevent hooks from trying to refresh
-        queryClient.setQueryData(authKeys.currentUser(), null);
-
-        // Then perform the actual logout request
-        await authAPI.logout();
-        return true;
-      } catch (error) {
-        console.error("Logout API error:", error);
-        // Even if the API call fails, still consider the user logged out locally
-        return false;
-      }
-    },
+    mutationFn: authAPI.logout,
     onSuccess: () => {
-      // Reset auth state
+      // Reset auth state and clear cache on successful logout
       queryClient.setQueryData(authKeys.currentUser(), null);
-
-      // Invalidate all queries to clear cache
-      queryClient.invalidateQueries();
+      queryClient.clear(); // Clear the entire cache
     },
   });
 }

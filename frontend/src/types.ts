@@ -1,8 +1,5 @@
 export type AuthTokens = {
-  // Simplify to focus on cookie-based auth response
   message: string;
-  // Only used in development mode
-  token?: string;
   expiresIn?: number;
 };
 

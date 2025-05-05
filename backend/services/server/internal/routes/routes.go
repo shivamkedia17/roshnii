@@ -9,7 +9,7 @@ import (
 	"github.com/shivamkedia17/roshnii/shared/pkg/config"
 )
 
-func RegisterAuth(routerGroup *gin.RouterGroup, authMiddleware gin.HandlerFunc, h *handlers.GoogleOAuthService) {
+func RegisterAuthRoutes(routerGroup *gin.RouterGroup, authMiddleware gin.HandlerFunc, h *handlers.GoogleOAuthService) {
 	googleRoutes := routerGroup.Group("/auth/google")
 	{
 		googleRoutes.GET("/login", h.HandleLogin)
@@ -99,7 +99,7 @@ func SetupRouter(cfg *config.Config, handlers *handlers.Handlers, authMiddleware
 
 	api := router.Group("/api")
 
-	RegisterAuth(api, authMiddleware, &handlers.OAuth)
+	RegisterAuthRoutes(api, authMiddleware, &handlers.OAuth)
 	RegisterImageRoutes(api, authMiddleware, &handlers.Img)
 	RegisterAlbumRoutes(api, authMiddleware, &handlers.Album)
 	RegisterUserRoutes(api, authMiddleware, &handlers.User)
