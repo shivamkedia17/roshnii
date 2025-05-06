@@ -1,76 +1,40 @@
-import { apiClient, EndpointParams } from "./api";
+import axiosInstance from "./api";
 import { ImageMetadata } from "./model";
 
 export const ImagesAPI = {
-  baseEndpoint: "/images",
-
   listImages: async function () {
-    const params: EndpointParams = {
-      endpoint: this.baseEndpoint,
-      includeCookies: true,
-      options: {
-        method: "GET",
-      },
-    };
-
-    return await apiClient<ImageMetadata[]>(params);
+    const response = await axiosInstance.get("/images");
+    return response.data as ImageMetadata[];
   },
 
   uploadImage: async function (file: File) {
-    // check if correct headers are being set
     const formData = new FormData();
     formData.append("file", file);
 
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/upload`,
-      includeCookies: true,
-      options: {
-        method: "POST",
-        body: formData,
+    const response = await axiosInstance.post("/images/upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
       },
-    };
+    });
 
-    return await apiClient<ImageMetadata>(params);
+    return response.data as ImageMetadata;
   },
 
   getImageMetadata: async function (imageId: string) {
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/${imageId}`,
-      includeCookies: true,
-      options: {
-        method: "GET",
-      },
-    };
-
-    return await apiClient<ImageMetadata>(params);
+    const response = await axiosInstance.get(`/images/${imageId}`);
+    return response.data as ImageMetadata;
   },
 
   deleteImage: async function (imageId: string) {
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/${imageId}`,
-      includeCookies: true,
-      options: {
-        method: "DELETE",
-      },
-    };
-
-    return await apiClient<{ message: string }>(params);
+    const response = await axiosInstance.delete(`/images/${imageId}`);
+    return response.data;
   },
 
   loadImage: async function (imageId: string) {
-    const url = `/api${this.baseEndpoint}/${imageId}/download`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      credentials: "include",
+    const response = await axiosInstance.get(`/images/${imageId}/download`, {
+      responseType: "blob",
     });
 
-    if (!response.ok) {
-      throw new Error(
-        `Failed to load image: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    return await response.blob();
+    return response.data;
   },
 };

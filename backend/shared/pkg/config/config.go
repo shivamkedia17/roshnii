@@ -47,6 +47,8 @@ type Config struct {
 	GoogleClientID     string `mapstructure:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret string `mapstructure:"GOOGLE_CLIENT_SECRET"`
 	FrontendURL        string `mapstructure:"FRONTEND_URL"` // To redirect back after OAuth
+
+	CookieDomain string `mapstructure:"COOKIE_DOMAIN"`
 }
 
 // LoadConfig loads configuration from file and environment variables.
@@ -62,6 +64,7 @@ func LoadConfig(path string) (*Config, error) {
 	viper.SetDefault("BLOB_STORAGE_TYPE", "local")
 	viper.SetDefault("LOCAL_STORAGE_PATH", "./uploads")
 	viper.SetDefault("FRONTEND_URL", "http://localhost:5173") // Default frontend URL
+	viper.SetDefault("COOKIE_DOMAIN", "localhost")            // Default frontend domain
 
 	viper.AddConfigPath(path)
 	viper.SetConfigName("app")

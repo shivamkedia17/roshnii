@@ -3,6 +3,8 @@ FROM golang:1.23-alpine AS builder
 
 WORKDIR /build
 
+RUN mkdir -p /go/pkg/mod /root/.cache/go-build
+
 # Copy go.mod and go.sum first to leverage Docker cache for dependencies
 COPY go.mod go.sum ./
 RUN go mod download

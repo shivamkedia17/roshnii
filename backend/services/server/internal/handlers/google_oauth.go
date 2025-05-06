@@ -118,17 +118,11 @@ func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
 	}
 
 	isCookieSecure := s.Config.Environment == config.ProdEnvironment
+	maxAge := int(5 * time.Minute / time.Second) // 5 minutes validity for the state
 
 	// Store the state in a secure, HttpOnly cookie
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     jwt.StateCookie,
-		Value:    state,
-		HttpOnly: true,
-		Secure:   isCookieSecure,                     // Use Secure in prod/staging
-		Path:     "/",                                // Accessible across the domain
-		MaxAge:   int(5 * time.Minute / time.Second), // 5 minutes validity for the state
-		SameSite: http.SameSiteLaxMode,               // Good default for OAuth redirects
-	})
+	c.SetCookie(jwt.StateCookie, state, maxAge, "/", s.Config.CookieDomain, isCookieSecure, true)
+	c.SetSameSite(http.SameSiteLaxMode)
 
 	// Refresh Token is NOT fetched from ID provider. Ask the user to reauthenticate when expires.
 	authConsentURL := s.OAuthConfig.AuthCodeURL(state, oauth2.AccessTypeOnline)
@@ -155,12 +149,8 @@ func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 	// }
 
 	// // Clear the state cookie once used
-	// http.SetCookie(c.Writer, &http.Cookie{
-	// 	Name:   jwt.StateCookie,
-	// 	Value:  "",
-	// 	Path:   "/",
-	// 	MaxAge: -1, // Delete cookie
-	// })
+	// c.SetCookie(jwt.StateCookie, "", -1, "/", "", false, true)
+	// c.SetSameSite(http.SameSiteLaxMode)
 
 	// queryState := c.Query("state")
 	// if queryState == "" || queryState != storedState {
@@ -250,26 +240,12 @@ func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 	isCookieSecure := s.Config.Environment == config.ProdEnvironment
 
 	// Set access token cookie
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     jwt.AuthTokenCookie,
-		Value:    accessToken,
-		HttpOnly: true,
-		Secure:   isCookieSecure,
-		Path:     "/",
-		MaxAge:   int(s.Config.TokenDuration / time.Second),
-		SameSite: http.SameSiteLaxMode,
-	})
+	c.SetCookie(jwt.AuthTokenCookie, accessToken, int(s.Config.TokenDuration/time.Second), "/", s.Config.CookieDomain, isCookieSecure, true)
+	c.SetSameSite(http.SameSiteLaxMode)
 
 	// Set refresh token cookie with longer expiration
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     jwt.RefreshTokenCookie,
-		Value:    refreshToken,
-		HttpOnly: true,
-		Secure:   isCookieSecure,
-		Path:     "/",
-		MaxAge:   int(s.Config.TokenDuration * 7 / time.Second), // 7x longer
-		SameSite: http.SameSiteLaxMode,
-	})
+	c.SetCookie(jwt.RefreshTokenCookie, refreshToken, int(s.Config.TokenDuration*7/time.Second), "/", s.Config.CookieDomain, isCookieSecure, true)
+	c.SetSameSite(http.SameSiteLaxMode)
 
 	// --- Added Logging ---
 	log.Printf("OAuth Callback: Set auth_token cookie successfully for user %s.", user.ID)
@@ -301,26 +277,12 @@ func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
 	isCookieSecure := s.Config.Environment == config.ProdEnvironment
 
 	// Clear the auth_token cookie
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     jwt.AuthTokenCookie,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1, // Delete cookie now
-		HttpOnly: true,
-		Secure:   isCookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
+	c.SetCookie(jwt.AuthTokenCookie, "", -1, "/", s.Config.CookieDomain, isCookieSecure, true)
+	c.SetSameSite(http.SameSiteLaxMode)
 
 	// Clear the refresh_token cookie
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     jwt.RefreshTokenCookie,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1, // Delete cookie now
-		HttpOnly: true,
-		Secure:   isCookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
+	c.SetCookie(jwt.RefreshTokenCookie, "", -1, "/", s.Config.CookieDomain, isCookieSecure, true)
+	c.SetSameSite(http.SameSiteLaxMode)
 
 	// Add explicit cache control headers
 	c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
@@ -348,16 +310,8 @@ func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 	if err != nil {
 		log.Printf("Refresh token validation failed: %v", err)
 
-		// Clear the invalid refresh token cookie
-		http.SetCookie(c.Writer, &http.Cookie{
-			Name:     jwt.RefreshTokenCookie,
-			Value:    "",
-			Path:     "/",
-			MaxAge:   -1,
-			HttpOnly: true,
-			Secure:   isCookieSecure,
-			SameSite: http.SameSiteLaxMode,
-		})
+		c.SetCookie(jwt.RefreshTokenCookie, "", -1, "/", s.Config.CookieDomain, isCookieSecure, true)
+		c.SetSameSite(http.SameSiteLaxMode)
 
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired refresh token"})
 		return
@@ -381,15 +335,8 @@ func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 	}
 
 	// Set the new access token cookie
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     jwt.AuthTokenCookie,
-		Value:    newAccessToken,
-		HttpOnly: true,
-		Secure:   isCookieSecure,
-		Path:     "/",
-		MaxAge:   int(s.Config.TokenDuration / time.Second),
-		SameSite: http.SameSiteLaxMode,
-	})
+	c.SetCookie(jwt.AuthTokenCookie, newAccessToken, int(s.Config.TokenDuration/time.Second), "/", s.Config.CookieDomain, isCookieSecure, true)
+	c.SetSameSite(http.SameSiteLaxMode)
 
 	// Response with success message
 	response := gin.H{"message": "Token refreshed successfully"}

@@ -52,3 +52,11 @@ export default tseslint.config({
   },
 })
 ```
+
+# Local Development
+
+Start the backend.
+
+```sh
+bun run dev
+```

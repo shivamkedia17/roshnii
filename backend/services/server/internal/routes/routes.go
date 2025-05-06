@@ -91,14 +91,14 @@ func SetupRouter(cfg *config.Config, handlers *handlers.Handlers, authMiddleware
 	// Enable credentials for cookies
 	corsConfig.AllowCredentials = true
 
-	// Allow common methods
-	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	// // Allow common methods
+	// corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
 
-	// Allow common headers
-	corsConfig.AllowHeaders = []string{
-		"Origin", "Content-Type", "Accept", "Authorization",
-		"X-Requested-With", "X-CSRF-Token", "Access-Control-Allow-Origin",
-	}
+	// // Allow common headers
+	// corsConfig.AllowHeaders = []string{
+	// 	"Origin", "Content-Type", "Accept", "Authorization",
+	// 	"X-Requested-With", "X-CSRF-Token", "Access-Control-Allow-Origin",
+	// }
 
 	// Add Access-Control-Expose-Headers to expose custom headers to the frontend
 	corsConfig.ExposeHeaders = []string{"Content-Length", "Content-Type"}

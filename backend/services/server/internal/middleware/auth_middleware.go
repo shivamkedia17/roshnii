@@ -19,13 +19,15 @@ const (
 // AuthMiddleware creates a Gin middleware for JWT authentication.
 func AuthMiddleware(jwtService jwt.JWTService) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		log.Println("Cookies: ", c.Request.Cookies())
 		// 1. Get auth token from cookie
 		cookie, err := c.Cookie(jwt.AuthTokenCookie)
-		if err == nil && cookie == "" {
+		if err == http.ErrNoCookie {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 			return
 		}
 
+		log.Println("Auth Token: ", cookie)
 		// Validate the token
 		claims, err := jwtService.ValidateToken(cookie)
 		if err != nil {
@@ -45,13 +47,7 @@ func AuthMiddleware(jwtService jwt.JWTService) gin.HandlerFunc {
 			log.Printf("Token validation failed: %v", err)
 
 			// Clear potentially invalid cookie
-			http.SetCookie(c.Writer, &http.Cookie{
-				Name:     "auth_token",
-				Value:    "",
-				Path:     "/",
-				MaxAge:   -1,
-				HttpOnly: true,
-			})
+			c.SetCookie(jwt.AuthTokenCookie, "", -1, "/", "", false, true)
 
 			c.AbortWithStatusJSON(statusCode, gin.H{"error": errorMessage})
 			return

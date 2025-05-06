@@ -1,3 +1,5 @@
+export const API_URL = "/api";
+
 // Type aliases
 export type UserID = string; // UUID
 export type ImageID = string; // UUID

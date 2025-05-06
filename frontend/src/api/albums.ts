@@ -1,44 +1,20 @@
-import { apiClient, EndpointParams } from "./api";
+import axiosInstance from "./api";
 import { Album, ImageMetadata } from "./model";
 
 export const AlbumsAPI = {
-  baseEndpoint: "/albums",
-
   listAlbums: async function () {
-    const params: EndpointParams = {
-      endpoint: this.baseEndpoint,
-      includeCookies: true,
-      options: {
-        method: "GET",
-      },
-    };
-
-    return await apiClient<Album[]>(params);
+    const response = await axiosInstance.get("/albums");
+    return response.data as Album[];
   },
 
   createAlbum: async function (name: string, description: string = "") {
-    const params: EndpointParams = {
-      endpoint: this.baseEndpoint,
-      includeCookies: true,
-      options: {
-        method: "POST",
-        body: JSON.stringify({ name, description }),
-      },
-    };
-
-    return await apiClient<Album>(params);
+    const response = await axiosInstance.post("/albums", { name, description });
+    return response.data as Album;
   },
 
   getAlbum: async function (albumId: string) {
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/${albumId}`,
-      includeCookies: true,
-      options: {
-        method: "GET",
-      },
-    };
-
-    return await apiClient<Album>(params);
+    const response = await axiosInstance.get(`/albums/${albumId}`);
+    return response.data as Album;
   },
 
   updateAlbum: async function (
@@ -46,64 +22,34 @@ export const AlbumsAPI = {
     name: string,
     description: string = "",
   ) {
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/${albumId}`,
-      includeCookies: true,
-      options: {
-        method: "PUT",
-        body: JSON.stringify({ name, description }),
-      },
-    };
-
-    return await apiClient<{ message: string }>(params);
+    const response = await axiosInstance.put(`/albums/${albumId}`, {
+      name,
+      description,
+    });
+    return response.data;
   },
 
   deleteAlbum: async function (albumId: string) {
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/${albumId}`,
-      includeCookies: true,
-      options: {
-        method: "DELETE",
-      },
-    };
-
-    return await apiClient<{ message: string }>(params);
+    const response = await axiosInstance.delete(`/albums/${albumId}`);
+    return response.data;
   },
 
   getAlbumImages: async function (albumId: string) {
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/${albumId}/images`,
-      includeCookies: true,
-      options: {
-        method: "GET",
-      },
-    };
-
-    return await apiClient<ImageMetadata[]>(params);
+    const response = await axiosInstance.get(`/albums/${albumId}/images`);
+    return response.data as ImageMetadata[];
   },
 
   addAlbumImage: async function (albumId: string, imageId: string) {
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/${albumId}/images`,
-      includeCookies: true,
-      options: {
-        method: "POST",
-        body: JSON.stringify({ image_id: imageId }),
-      },
-    };
-
-    return await apiClient<{ message: string }>(params);
+    const response = await axiosInstance.post(`/albums/${albumId}/images`, {
+      image_id: imageId,
+    });
+    return response.data;
   },
 
   deleteAlbumImage: async function (albumId: string, imageId: string) {
-    const params: EndpointParams = {
-      endpoint: `${this.baseEndpoint}/${albumId}/images/${imageId}`,
-      includeCookies: true,
-      options: {
-        method: "DELETE",
-      },
-    };
-
-    return await apiClient<{ message: string }>(params);
+    const response = await axiosInstance.delete(
+      `/albums/${albumId}/images/${imageId}`,
+    );
+    return response.data;
   },
 };
