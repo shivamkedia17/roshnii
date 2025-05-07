@@ -18,7 +18,7 @@ import (
 func main() {
 	// 1. Load Configuration
 	// Load from current directory (where server runs) or use "../.." for project root
-	cfg, err := config.LoadConfig("../..")
+	cfg, err := config.LoadConfig("./")
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}

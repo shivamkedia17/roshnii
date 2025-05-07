@@ -8,7 +8,7 @@ services:
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
             POSTGRES_DB: ${POSTGRES_DB}
         ports:
-            - "5432:5432" # Map host 5432 to container 5432 for dev access
+            - "5555:5432" # Map host 5432 to container 5432 for dev access
         volumes:
             - ./db:/docker-entrypoint-initdb.d # Initialize schema on first start
             # This line mounts a local 'db' directory from your host into the container's /docker-entrypoint-initdb.d directory.
@@ -25,41 +25,6 @@ services:
             interval: 5s
             timeout: 5s
             retries: 5
-        networks:
-            - dev_network
-
-    # Backend Application Service (Development Mode)
-    backend:
-        build:
-            context: .
-            dockerfile: Dockerfile
-        container_name: roshnii-backend-dev
-        depends_on:
-            db:
-                condition: service_healthy # Wait for DB to be ready based on healthcheck
-        ports:
-            - "8080:8080" # Map host 8080 to container 8080
-        environment:
-            ENVIRONMENT: ${ENVIRONMENT} # Set development mode
-            POSTGRES_URL: ${POSTGRES_URL} # Use the dev DB URL
-            SERVER_HOST: 0.0.0.0 # Listen on all interfaces inside container
-            SERVER_PORT: 8080
-            PUBLIC_HOST: 127.0.0.1
-            PUBLIC_PORT: 8080
-            JWT_SECRET: ${JWT_SECRET}
-            TOKEN_DURATION: ${TOKEN_DURATION}
-            GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-            GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-            FRONTEND_URL: ${FRONTEND_URL}
-            # Add other config vars as needed (e.g., storage path if not default)
-            # LOCAL_STORAGE_PATH: /app/uploads # Example if needed
-        networks:
-            - dev_network
-
-# Define the network
-networks:
-    dev_network:
-        driver: bridge
 
 # Define the named volume for persistent dev data
 volumes:

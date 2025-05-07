@@ -2,3 +2,4 @@ oauth_creds
 .DS_Store
 .env*
 dummy*
+main

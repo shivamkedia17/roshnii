@@ -71,7 +71,7 @@ func NewPostgresStore(databaseURL string) (Store, error) {
 // initializeSchema reads and executes the schema.sql file
 func initializeSchema(ctx context.Context, pool *pgxpool.Pool) error {
 	// Path relative to where the application runs
-	schemaPath := "./schema.sql"
+	schemaPath := "db/schema.sql"
 
 	// Read the schema file
 	schemaSQL, err := os.ReadFile(schemaPath)

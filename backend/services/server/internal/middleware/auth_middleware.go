@@ -47,7 +47,8 @@ func AuthMiddleware(jwtService jwt.JWTService) gin.HandlerFunc {
 			log.Printf("Token validation failed: %v", err)
 
 			// Clear potentially invalid cookie
-			c.SetCookie(jwt.AuthTokenCookie, "", -1, "/", "", false, true)
+			// c.SetCookie(jwt.AuthTokenCookie, "", -1, "/", "", false, true)
+			// c.SetSameSite(http.SameSiteNoneMode)
 
 			c.AbortWithStatusJSON(statusCode, gin.H{"error": errorMessage})
 			return

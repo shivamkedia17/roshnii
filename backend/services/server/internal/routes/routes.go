@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -72,6 +73,7 @@ func SetupRouter(cfg *config.Config, handlers *handlers.Handlers, authMiddleware
 	// a. Extract Relevant Config
 	environment := cfg.Environment
 	frontEndURL := cfg.FrontendURL
+	frontendBuildPath := cfg.FrontendBuildPath
 	// TODO // serverURL 	:= deps.Config.ServerHost
 
 	// b. Setup Gin Engine
@@ -86,7 +88,7 @@ func SetupRouter(cfg *config.Config, handlers *handlers.Handlers, authMiddleware
 
 	// Set allowed origins from configuration
 	// FIXME change hardcoded server address to cfg based dynamic address
-	corsConfig.AllowOrigins = []string{frontEndURL, "http://localhost:8080", "http://localhost:5173"}
+	corsConfig.AllowOrigins = []string{frontEndURL, "http://127.0.0.1:8080", "http://127.0.0.1:5173", "http://localhost:5173", "http://localhost:8080"}
 
 	// Enable credentials for cookies
 	corsConfig.AllowCredentials = true
@@ -112,6 +114,7 @@ func SetupRouter(cfg *config.Config, handlers *handlers.Handlers, authMiddleware
 		c.JSON(http.StatusOK, gin.H{"status": "UP"})
 	})
 
+	// API routes
 	api := router.Group("/api")
 
 	RegisterAuthRoutes(api, authMiddleware, &handlers.OAuth)
@@ -120,5 +123,29 @@ func SetupRouter(cfg *config.Config, handlers *handlers.Handlers, authMiddleware
 	RegisterUserRoutes(api, authMiddleware, &handlers.User)
 	// RegisterSearchRoutes()
 
+	// Serve frontend static files
+	RegisterStaticAssets(router, frontendBuildPath)
+
 	return router
+}
+
+// RegisterStaticAssets sets up routes to serve the React frontend static files
+func RegisterStaticAssets(router *gin.Engine, frontendPath string) {
+	// Serve the static files (JS, CSS, images)
+	router.Static("/assets", frontendPath+"/assets")
+
+	// Serve the favicon and other root files
+	// router.StaticFile("/favicon.ico", frontendPath+"/favicon.ico")
+	// router.StaticFile("/robots.txt", frontendPath+"/robots.txt")
+
+	// For any other route, serve the index.html file (for React router to handle)
+	router.NoRoute(func(c *gin.Context) {
+		// Only serve index.html for non-API routes
+		if !strings.HasPrefix(c.Request.URL.Path, "/api") {
+			c.File(frontendPath + "/index.html")
+		} else {
+			// Let API 404s pass through
+			c.JSON(http.StatusNotFound, gin.H{"error": "API endpoint not found"})
+		}
+	})
 }

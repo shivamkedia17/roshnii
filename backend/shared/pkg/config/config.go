@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -46,9 +47,11 @@ type Config struct {
 
 	GoogleClientID     string `mapstructure:"GOOGLE_CLIENT_ID"`
 	GoogleClientSecret string `mapstructure:"GOOGLE_CLIENT_SECRET"`
-	FrontendURL        string `mapstructure:"FRONTEND_URL"` // To redirect back after OAuth
+	FrontendURL        string `mapstructure:"FRONTEND_URL"`        // To redirect back after OAuth
+	FrontendBuildPath  string `mapstructure:"FRONTEND_BUILD_PATH"` // Path to the React build directory
 
-	CookieDomain string `mapstructure:"COOKIE_DOMAIN"`
+	CookieDomain   string        `mapstructure:"COOKIE_DOMAIN"`
+	CookieSameSite http.SameSite `mapstructure:"COOKIE_SAMESITE"`
 }
 
 // LoadConfig loads configuration from file and environment variables.
@@ -63,11 +66,13 @@ func LoadConfig(path string) (*Config, error) {
 	viper.SetDefault("TOKEN_DURATION", "24h")
 	viper.SetDefault("BLOB_STORAGE_TYPE", "local")
 	viper.SetDefault("LOCAL_STORAGE_PATH", "./uploads")
-	viper.SetDefault("FRONTEND_URL", "http://localhost:5173") // Default frontend URL
-	viper.SetDefault("COOKIE_DOMAIN", "localhost")            // Default frontend domain
+	viper.SetDefault("FRONTEND_URL", "http://localhost:5173")  // Default frontend URL
+	viper.SetDefault("FRONTEND_BUILD_PATH", "./frontend/dist") // Default frontend build path
+	viper.SetDefault("COOKIE_DOMAIN", "")                      // Default frontend domain
+	viper.SetDefault("COOKIE_SAMESITE", http.SameSiteNoneMode) // Default Cookie SameSite Attribute
 
 	viper.AddConfigPath(path)
-	viper.SetConfigName("app")
+	viper.SetConfigName(".env")
 	viper.SetConfigType("env") // Expecting .env or app.env file
 
 	viper.AutomaticEnv()
