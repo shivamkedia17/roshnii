@@ -4,30 +4,33 @@ services:
         image: postgres:15-alpine
         container_name: roshnii-postgres-dev
         environment:
-            POSTGRES_USER: ${POSTGRES_USER} # Read from .env file
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-            POSTGRES_DB: ${POSTGRES_DB}
-            DB_PORT: ${DB_PORT}
-
+            POSTGRES_USER: ${POSTGRES_USER:-roshnii}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-abcd1234}
+            POSTGRES_DB: ${POSTGRES_DB:-roshnii_db}
+            # A database is created with these values in the directory, so the init.sql file is not needed.
+            DB_PORT: ${DB_PORT:-5432}
         ports:
-            - "${DB_PORT}:5432" # Map host 5432 to container 5432 for dev access
+            - "${DB_PORT:-5432}:5432" # Map host port to container 5432
         volumes:
-            - ./db:/docker-entrypoint-initdb.d # Initialize schema on first start
+            - ./db:/docker-entrypoint-initdb.d # Mount SCHEMA initialization scripts, DATABASE already created
             # This line mounts a local 'db' directory from your host into the container's /docker-entrypoint-initdb.d directory.
             # PostgreSQL automatically executes all .sql, .sql.gz, and .sh files found in this directory in alphabetical order
             # when the container is first initialized (only if the data directory is empty).
             # This allows you to define database initialization scripts like creating tables, indexes, and loading initial data.
-            - postgres_dev_data:/var/lib/postgresql/data # Persist dev data
+            - postgres_data_roshnii_dev:/var/lib/postgresql/data
+        restart: unless-stopped
         healthcheck:
             test:
                 [
                     "CMD-SHELL",
-                    "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}",
+                    "pg_isready -U ${POSTGRES_USER:-roshnii} -d ${POSTGRES_DB:-roshnii_db}",
                 ]
             interval: 5s
             timeout: 5s
             retries: 5
 
-# Define the named volume for persistent dev data
 volumes:
-    postgres_dev_data:
+    # Define the volume but with no explicit configuration
+    # This allows Docker to manage it completely
+    postgres_data_roshnii_dev:
+        driver: local

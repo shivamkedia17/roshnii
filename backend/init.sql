@@ -1,5 +1,6 @@
+-- USE THIS SCRIPT ONLY WHEN MANUALLY CREATING THE DATABASE WITHOUT DOCKER
+--
 -- Connect to your PostgreSQL instance as a superuser (e.g., postgres) first
--- then run these commands using psql or a GUI tool:
 -- Create the database (if it doesn't exist)
 CREATE DATABASE roshnii_db;
 

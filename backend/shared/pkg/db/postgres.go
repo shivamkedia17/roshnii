@@ -57,12 +57,12 @@ func NewPostgresStore(databaseURL string) (Store, error) {
 	}
 
 	// Initialize DB schema from file
-	err = initializeSchema(ctx, pool)
-	if err != nil {
-		pool.Close()
-		log.Printf("Error initializing database schema: %v", err)
-		return nil, err
-	}
+	// err = initializeSchema(ctx, pool)
+	// if err != nil {
+	// 	pool.Close()
+	// 	log.Printf("Error initializing database schema: %v", err)
+	// 	return nil, err
+	// }
 
 	log.Println("Successfully connected to PostgreSQL and verified connection.")
 	return &PostgresStore{Pool: pool}, nil

@@ -71,7 +71,7 @@ Before you begin, ensure you have the following installed:
 *   **Google OAuth Credentials:** You need to create credentials in the Google Cloud Console (\url{https://console.cloud.google.com/apis/credentials}) for a Web Application:
     *   Client ID
     *   Client Secret
-    *   Set the **Authorized redirect URIs** to `http://localhost:8080/api/auth/google/callback` (or adjust host/port if your setup differs).
+    *   Set the **Authorized redirect URIs** to `http://127.0.0.1:8080/api/auth/google/callback` (or adjust host/port if your setup differs).
 
 ## Getting Started & Local Setup
 

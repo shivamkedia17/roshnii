@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --- Configuration ---
-BASE_URL="http://localhost:8080" # Adjust if your server runs elsewhere
+BASE_URL="http://127.0.0.1:8080" # Adjust if your server runs elsewhere
 API_URL="$BASE_URL/api"
 # Use a test email for the dev login
 TEST_EMAIL="testuser-$(date +%s)@example.com" # Add timestamp for uniqueness
