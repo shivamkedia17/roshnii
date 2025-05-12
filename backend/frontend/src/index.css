@@ -1,6 +1,6 @@
-* {
+/* * {
     outline: solid 0.5px black;
-}
+} */
 
 /* https://www.canva.com/colors/color-palettes/summer-splash/ */
 :root {
@@ -92,7 +92,7 @@ button {
     transition: border-color 0.25s;
 }
 button:hover {
-    border-color: var(--border-color-focused);
+    background-color: var(--secondary-color-light);
 }
 button:focus,
 button:focus-visible {

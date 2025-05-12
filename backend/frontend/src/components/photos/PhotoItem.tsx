@@ -35,11 +35,13 @@ export function PhotoItem({ imageDetails, onClick }: PhotoItemProps) {
           <p>Failed to load image</p>
         </div>
       ) : (
-        <img
-          src={imageBlobURL}
-          alt={"Photo"}
-          className={`photo-thumbnail ${isFetching ? "loading" : ""}`}
-        />
+        imageBlobURL && (
+          <img
+            src={imageBlobURL}
+            alt={"Photo"}
+            className={`photo-thumbnail ${isFetching ? "loading" : ""}`}
+          />
+        )
       )}
     </div>
   );

@@ -25,7 +25,7 @@
 }
 
 .album-info {
-    padding: var(--padding-m) 0;
+    padding: var(--padding-m);
 }
 
 .album-title-section {
@@ -171,7 +171,7 @@
 }
 
 .remove-from-album-button {
-    position: absolute;
+    /* position: absolute; */
     top: 8px;
     right: 8px;
     background-color: rgba(0, 0, 0, 0.6);

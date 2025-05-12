@@ -16,7 +16,9 @@ export function AlbumItem({ album, onSelect, onDelete }: AlbumItemProps) {
       </div>
       <div className="album-info">
         <h3>{album.name}</h3>
-        <p className="album-description">{album.description || "No description"}</p>
+        {album.description && (
+          <p className="album-description">{album.description} </p>
+        )}
         <p className="album-date">
           Updated {new Date(album.updated_at).toLocaleDateString()}
         </p>

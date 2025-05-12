@@ -17,12 +17,14 @@ export function PhotoModal({ imageId, albumId, onClose }: PhotoModalProps) {
   const {
     data: imageMetadata,
     isLoading: isMetadataLoading,
+    isFetching: isMetadataFetching,
     error: metadataError,
   } = useListImage(imageId);
 
   const {
     data: imageBlob,
     isLoading: isBlobLoading,
+    isFetching: isBlobFetching,
     error: blobError,
   } = useGetImage(imageId);
 
@@ -44,16 +46,23 @@ export function PhotoModal({ imageId, albumId, onClose }: PhotoModalProps) {
 
   // Derived states
   const isLoading = isMetadataLoading || isBlobLoading;
+  const isFetching = isMetadataFetching || isBlobFetching;
   const error = metadataError || blobError;
 
   // Create object URL for the blob and ensure proper cleanup
   const [imageBlobURL, setImageBlobURL] = useState<string>("");
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageDimensions, setImageDimensions] = useState({
+    width: 0,
+    height: 0,
+  });
 
   // Set up and clean up object URL when blob changes
   useEffect(() => {
     if (imageBlob) {
       const url = URL.createObjectURL(imageBlob);
       setImageBlobURL(url);
+      setImageLoaded(false);
 
       // revoke the object URL when component unmounts or blob changes
       return () => {
@@ -63,7 +72,7 @@ export function PhotoModal({ imageId, albumId, onClose }: PhotoModalProps) {
   }, [imageBlob]);
 
   // Loading State
-  if (isLoading) {
+  if (isLoading || isFetching) {
     return (
       <div className="photo-modal-overlay">
         <div className="photo-modal loading">
@@ -104,11 +113,19 @@ export function PhotoModal({ imageId, albumId, onClose }: PhotoModalProps) {
 
         <div className="modal-body">
           <div className="photo-container">
-            {imageBlob && (
+            {imageBlobURL && (
               <img
                 src={imageBlobURL}
                 alt={imageMetadata.filename || "Photo"}
                 className="full-size-photo"
+                onLoad={(e) => {
+                  const img = e.target as HTMLImageElement;
+                  setImageDimensions({
+                    width: img.naturalWidth,
+                    height: img.naturalHeight,
+                  });
+                  setImageLoaded(true);
+                }}
               />
             )}
           </div>
@@ -131,20 +148,22 @@ export function PhotoModal({ imageId, albumId, onClose }: PhotoModalProps) {
               </span>
             </div>
 
-            {imageMetadata.width && imageMetadata.height && (
-              <div className="detail-row">
-                <span className="detail-label">Dimensions:</span>
-                <span className="detail-value">
-                  {imageMetadata.width} × {imageMetadata.height}
-                </span>
-              </div>
-            )}
+            <div className="detail-row">
+              <span className="detail-label">Dimensions:</span>
+              <span className="detail-value">
+                {imageLoaded && imageDimensions.width > 0
+                  ? `${imageDimensions.width} × ${imageDimensions.height}`
+                  : imageMetadata.width && imageMetadata.height
+                    ? `${imageMetadata.width} × ${imageMetadata.height}`
+                    : "Unavailable"}
+              </span>
+            </div>
           </div>
         </div>
 
         <div className="modal-footer">
           {/* Only show Add to Album button when not in album context */}
-          {!albumId && (
+          {!albumId ? (
             <button
               className="add-to-album-button"
               onClick={() => setShowAddToAlbumModal(true)}
@@ -152,10 +171,7 @@ export function PhotoModal({ imageId, albumId, onClose }: PhotoModalProps) {
             >
               Add to Album
             </button>
-          )}
-
-          {/* Show Remove from Album when in album context */}
-          {albumId && (
+          ) : (
             <button
               className="remove-from-album-button"
               onClick={handleRemoveFromAlbum}

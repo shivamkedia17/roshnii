@@ -161,6 +161,7 @@
 .add-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    color: white; /* Ensure text remains white even when disabled */
 }
 
 .no-albums {

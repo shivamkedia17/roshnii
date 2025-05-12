@@ -113,7 +113,7 @@
 
 /* Submit button */
 form button[type="submit"] {
-    background-color: var(--secondary-color-light, #3498db);
+    background-color: var(#3498db);
 
     border: none;
     padding: var(--padding-m);

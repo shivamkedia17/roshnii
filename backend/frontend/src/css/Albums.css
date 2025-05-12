@@ -132,14 +132,14 @@
 }
 
 .view-album-button {
-    background-color: var(--primary-color-light, #e3f2fd);
-    color: var(--primary-color, #3498db);
+    background-color: #e3f2fd;
+    color: #3498db;
     margin-right: var(--margin-xs);
 }
 
 .view-album-button:hover {
-    background-color: var(--primary-color, #3498db);
-    color: white;
+    background-color: #3498db;
+    color: #e3f2fd;
 }
 
 .delete-album-button {
