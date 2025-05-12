@@ -21,6 +21,8 @@ import (
 	"github.com/shivamkedia17/roshnii/shared/pkg/models"
 )
 
+const isCookieSecure = true
+
 // generateState generates a random string for the OAuth state parameter.
 func generateState() (string, error) {
 	b := make([]byte, 32) // Increased size for better security
@@ -117,7 +119,6 @@ func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
 		return
 	}
 
-	isCookieSecure := s.Config.Environment == config.ProdEnvironment
 	maxAge := int(5 * time.Minute / time.Second) // 5 minutes validity for the state
 
 	// Store the state in a secure, HttpOnly cookie
@@ -139,25 +140,25 @@ func (s *GoogleOAuthService) HandleLogin(c *gin.Context) {
 // HandleCallback handles the callback from Google after user authorization.
 func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 	// // 1. Verify State
-	// storedState, err := c.Cookie(jwt.StateCookie)
-	// if err != nil {
-	cookies := c.Request.Cookies()
-	log.Printf("Cookies Found: %v", cookies)
-	// 	log.Printf("OAuth Callback Error: State cookie not found: %v", err)
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid callback state when logging in. Please try logging in again."})
-	// 	return
-	// }
+	storedState, err := c.Cookie(jwt.StateCookie)
+	if err != nil {
+		cookies := c.Request.Cookies()
+		log.Printf("Cookies Found: %v", cookies)
+		log.Printf("OAuth Callback Error: State cookie not found: %v", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid callback state when logging in. Please try logging in again."})
+		return
+	}
 
-	// // Clear the state cookie once used
-	// c.SetCookie(jwt.StateCookie, "", -1, "/", "", false, true)
-	// c.SetSameSite(s.Config.CookieSameSite)
+	// Clear the state cookie once used
+	c.SetCookie(jwt.StateCookie, "", -1, "/", "", false, true)
+	c.SetSameSite(s.Config.CookieSameSite)
 
-	// queryState := c.Query("state")
-	// if queryState == "" || queryState != storedState {
-	// 	log.Printf("OAuth Callback Error: Invalid state parameter. Expected '%s', got '%s'", storedState, queryState)
-	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid OAuth state."})
-	// 	return
-	// }
+	queryState := c.Query("state")
+	if queryState == "" || queryState != storedState {
+		log.Printf("OAuth Callback Error: Invalid state parameter. Expected '%s', got '%s'", storedState, queryState)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid OAuth state."})
+		return
+	}
 
 	// 2. Handle Potential Errors from Google
 	errorParam := c.Query("error")
@@ -237,8 +238,6 @@ func (s *GoogleOAuthService) HandleCallback(c *gin.Context) {
 		return
 	}
 
-	isCookieSecure := s.Config.Environment == config.ProdEnvironment
-
 	// Set access token cookie
 	c.SetCookie(jwt.AuthTokenCookie, accessToken, int(s.Config.TokenDuration/time.Second), "/", s.Config.CookieDomain, isCookieSecure, true)
 	c.SetSameSite(s.Config.CookieSameSite)
@@ -274,8 +273,6 @@ func (s *GoogleOAuthService) HandleLogout(c *gin.Context) {
 		}
 	}
 
-	isCookieSecure := s.Config.Environment == config.ProdEnvironment
-
 	// Clear the auth_token cookie
 	c.SetCookie(jwt.AuthTokenCookie, "", -1, "/", s.Config.CookieDomain, isCookieSecure, true)
 	c.SetSameSite(s.Config.CookieSameSite)
@@ -302,8 +299,6 @@ func (s *GoogleOAuthService) HandleRefreshToken(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Refresh token not provided"})
 		return
 	}
-
-	isCookieSecure := s.Config.Environment == config.ProdEnvironment
 
 	// Validate refresh token
 	claims, err := s.JWTService.ValidateRefreshToken(refreshToken)

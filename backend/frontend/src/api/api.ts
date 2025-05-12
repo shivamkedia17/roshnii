@@ -20,6 +20,7 @@ axiosInstance.interceptors.response.use(
     // Check if the error is a 401 unauthorized error
     if (error.response?.status === 401) {
       // Check if the error message indicates token refresh is needed
+      // TODO: Update server to respond with "Proxy Authentication Required" when auth_token has expired
       if (
         error.response.data?.message?.includes("expired token") &&
         !originalRequest._retry
@@ -33,10 +34,10 @@ axiosInstance.interceptors.response.use(
           // Retry the original request with the new token
           return axiosInstance(originalRequest);
         } catch (refreshError) {
-          // If refresh fails, dispatch an auth error event
+          // If refresh fails, dispatch an error event
           window.dispatchEvent(
-            new CustomEvent("authError", {
-              detail: { message: "Authentication failed" },
+            new CustomEvent("refreshError", {
+              detail: { message: "Could not refresh token." },
             }),
           );
           return Promise.reject(refreshError);
@@ -45,7 +46,7 @@ axiosInstance.interceptors.response.use(
         // For other 401 errors, dispatch auth error event
         window.dispatchEvent(
           new CustomEvent("authError", {
-            detail: { message: "Authentication failed" },
+            detail: { message: "Unauthorized Request." },
           }),
         );
       }
