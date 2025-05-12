@@ -1,5 +1,6 @@
 oauth_creds
 .DS_Store
 .env*
-dummy*
+dummy*/
 main
+*/uploads/*

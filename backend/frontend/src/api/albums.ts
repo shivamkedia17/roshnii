@@ -1,5 +1,5 @@
 import axiosInstance from "./api";
-import { Album, ImageMetadata } from "./model";
+import { Album, ImageMetadata, ServerMessage } from "./model";
 
 export const AlbumsAPI = {
   listAlbums: async function () {
@@ -7,12 +7,7 @@ export const AlbumsAPI = {
     return response.data as Album[];
   },
 
-  createAlbum: async function (name: string, description: string = "") {
-    const response = await axiosInstance.post("/albums", { name, description });
-    return response.data as Album;
-  },
-
-  getAlbum: async function (albumId: string) {
+  listAlbum: async function (albumId: string) {
     const response = await axiosInstance.get(`/albums/${albumId}`);
     return response.data as Album;
   },
@@ -26,15 +21,15 @@ export const AlbumsAPI = {
       name,
       description,
     });
-    return response.data;
+    return response.data as ServerMessage;
   },
 
   deleteAlbum: async function (albumId: string) {
     const response = await axiosInstance.delete(`/albums/${albumId}`);
-    return response.data;
+    return response.data as ServerMessage;
   },
 
-  getAlbumImages: async function (albumId: string) {
+  listAlbumImages: async function (albumId: string) {
     const response = await axiosInstance.get(`/albums/${albumId}/images`);
     return response.data as ImageMetadata[];
   },
@@ -43,13 +38,18 @@ export const AlbumsAPI = {
     const response = await axiosInstance.post(`/albums/${albumId}/images`, {
       image_id: imageId,
     });
-    return response.data;
+    return response.data as ServerMessage;
   },
 
   deleteAlbumImage: async function (albumId: string, imageId: string) {
     const response = await axiosInstance.delete(
       `/albums/${albumId}/images/${imageId}`,
     );
-    return response.data;
+    return response.data as ServerMessage;
+  },
+
+  createAlbum: async function (name: string, description: string = "") {
+    const response = await axiosInstance.post("/albums", { name, description });
+    return response.data as Album;
   },
 };

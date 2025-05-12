@@ -29,8 +29,8 @@ export function useLogin() {
 export function useLogout() {
   const queryClient = useQueryClient();
 
-  // server returns a message only in the absence of any errors
-  // Server clear cookies on successful request
+  // backend server returns a message only in the absence of any errors
+  // backend server clear cookies on successful request
   const mutation = useMutation({
     mutationFn: AuthAPI.logout,
     onSuccess: () => {

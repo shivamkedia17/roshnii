@@ -9,7 +9,6 @@ export function TempLogout() {
         <h1>Logged In!</h1>
         <button onClick={() => logout()}>Log Out</button>
       </div>
-      ;
     </>
   );
 }

@@ -25,6 +25,7 @@ export function useGetCurrentUser(): CurrentUserDetails {
     queryKey: authKeys.user,
     queryFn: UserAPI.getCurrentUser,
     // refetchOnMount: "always",
+    retry: false,
   });
 
   // 1. check if loading
