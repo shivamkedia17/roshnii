@@ -48,6 +48,7 @@ FRONTEND_URL=http://127.0.0.1:8080
 # Server settings
 SERVER_HOST=0.0.0.0
 SERVER_PORT=8080
+```
 
 3. Build the frontend app:
 ```sh
