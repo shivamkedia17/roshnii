@@ -100,130 +100,158 @@ export function PhotoModal({ imageId, albumId, onClose }: PhotoModalProps) {
     );
   }
 
+  const modalHeader = (
+    <div className="modal-header">
+      <h3>{imageMetadata.filename || "Photo"}</h3>
+      <button className="close-button" onClick={onClose}>
+        ×
+      </button>
+    </div>
+  );
+
+  const photoContainer = (
+    <div className="photo-container">
+      {imageBlobURL && (
+        <img
+          src={imageBlobURL}
+          alt={imageMetadata.filename || "Photo"}
+          className="full-size-photo"
+          onLoad={(e) => {
+            const img = e.target as HTMLImageElement;
+            setImageDimensions({
+              width: img.naturalWidth,
+              height: img.naturalHeight,
+            });
+            setImageLoaded(true);
+          }}
+        />
+      )}
+    </div>
+  );
+
+  const photoDetails = (
+    <div className="photo-details">
+      <div className="detail-row">
+        <span className="detail-label">Uploaded:</span>
+        <span className="detail-value">
+          {new Date(imageMetadata.created_at).toLocaleString()}
+        </span>
+      </div>
+      <div className="detail-row">
+        <span className="detail-label">Type:</span>
+        <span className="detail-value">{imageMetadata.content_type}</span>
+      </div>
+      <div className="detail-row">
+        <span className="detail-label">Size:</span>
+        <span className="detail-value">
+          {formatFileSize(imageMetadata.size)}
+        </span>
+      </div>
+
+      <div className="detail-row">
+        <span className="detail-label">Dimensions:</span>
+        <span className="detail-value">
+          {imageLoaded && imageDimensions.width > 0
+            ? `${imageDimensions.width} × ${imageDimensions.height}`
+            : imageMetadata.width && imageMetadata.height
+              ? `${imageMetadata.width} × ${imageMetadata.height}`
+              : "Unavailable"}
+        </span>
+      </div>
+    </div>
+  );
+
+  let addToAlbumButton = null;
+  let removefromAlbumButton = null;
+
+  if (albumId === undefined) {
+    addToAlbumButton = (
+      <button
+        className="add-to-album-button"
+        onClick={() => setShowAddToAlbumModal(true)}
+        // disabled={deleteImage}
+      >
+        Add to Album
+      </button>
+    );
+  }
+
+  if (albumId !== undefined) {
+    console.log("album Id not null, remove from album btn should render");
+    removefromAlbumButton = (
+      <button
+        className="remove-from-album-button"
+        onClick={handleRemoveFromAlbum}
+        // disabled={removeFromAlbum.isPending}
+      >
+        {/* {removeFromAlbum.isPending ? "Removing..." : "Remove from Album"} */}
+        Remove from Album
+      </button>
+    );
+  }
+
+  const deletePhotoButton = (
+    <button
+      className="delete-button"
+      onClick={() => setIsDeleteConfirmOpen(true)}
+      // disabled={deleteImage.isPending}
+    >
+      Delete Photo
+    </button>
+  );
+
+  const deleteConfirmationDialog = (
+    <div className="delete-confirm-dialog">
+      <h4>Delete Photo?</h4>
+      <p>This action cannot be undone.</p>
+
+      {/* {deleteImage.error && (
+          <div className="error">
+            {deleteImage.error instanceof Error
+              ? deleteImage.error.message
+              : "Failed to delete photo"}
+          </div>
+        )} */}
+
+      <div className="confirm-buttons">
+        <button
+          onClick={() => setIsDeleteConfirmOpen(false)}
+          className="cancel-button"
+          // disabled={deleteImage.isPending}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleDelete}
+          className="confirm-delete-button"
+          // disabled={deleteImage.isPending}
+        >
+          {/* {deleteImage.isPending ? "Deleting..." : "Confirm Delete"} */}
+          {"Confirm Delete"}
+        </button>
+      </div>
+    </div>
+  );
+
   // All is well
   return (
     <div className="photo-modal-overlay" onClick={onClose}>
       <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{imageMetadata.filename || "Photo"}</h3>
-          <button className="close-button" onClick={onClose}>
-            ×
-          </button>
-        </div>
-
+        {modalHeader}
         <div className="modal-body">
-          <div className="photo-container">
-            {imageBlobURL && (
-              <img
-                src={imageBlobURL}
-                alt={imageMetadata.filename || "Photo"}
-                className="full-size-photo"
-                onLoad={(e) => {
-                  const img = e.target as HTMLImageElement;
-                  setImageDimensions({
-                    width: img.naturalWidth,
-                    height: img.naturalHeight,
-                  });
-                  setImageLoaded(true);
-                }}
-              />
-            )}
-          </div>
-
-          <div className="photo-details">
-            <div className="detail-row">
-              <span className="detail-label">Uploaded:</span>
-              <span className="detail-value">
-                {new Date(imageMetadata.created_at).toLocaleString()}
-              </span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Type:</span>
-              <span className="detail-value">{imageMetadata.content_type}</span>
-            </div>
-            <div className="detail-row">
-              <span className="detail-label">Size:</span>
-              <span className="detail-value">
-                {formatFileSize(imageMetadata.size)}
-              </span>
-            </div>
-
-            <div className="detail-row">
-              <span className="detail-label">Dimensions:</span>
-              <span className="detail-value">
-                {imageLoaded && imageDimensions.width > 0
-                  ? `${imageDimensions.width} × ${imageDimensions.height}`
-                  : imageMetadata.width && imageMetadata.height
-                    ? `${imageMetadata.width} × ${imageMetadata.height}`
-                    : "Unavailable"}
-              </span>
-            </div>
-          </div>
+          {photoContainer}
+          {photoDetails}
         </div>
 
         <div className="modal-footer">
           {/* Only show Add to Album button when not in album context */}
-          {!albumId ? (
-            <button
-              className="add-to-album-button"
-              onClick={() => setShowAddToAlbumModal(true)}
-              // disabled={deleteImage}
-            >
-              Add to Album
-            </button>
-          ) : (
-            <button
-              className="remove-from-album-button"
-              onClick={handleRemoveFromAlbum}
-              // disabled={removeFromAlbum.isPending}
-            >
-              {/* {removeFromAlbum.isPending ? "Removing..." : "Remove from Album"} */}
-              {"Remove from Album"}
-            </button>
-          )}
-
-          <button
-            className="delete-button"
-            onClick={() => setIsDeleteConfirmOpen(true)}
-            // disabled={deleteImage.isPending}
-          >
-            Delete Photo
-          </button>
+          {addToAlbumButton}
+          {removefromAlbumButton}
+          {deletePhotoButton}
         </div>
 
         {/* Delete confirmation dialog */}
-        {isDeleteConfirmOpen && (
-          <div className="delete-confirm-dialog">
-            <h4>Delete Photo?</h4>
-            <p>This action cannot be undone.</p>
-
-            {/* {deleteImage.error && (
-              <div className="error">
-                {deleteImage.error instanceof Error
-                  ? deleteImage.error.message
-                  : "Failed to delete photo"}
-              </div>
-            )} */}
-
-            <div className="confirm-buttons">
-              <button
-                onClick={() => setIsDeleteConfirmOpen(false)}
-                className="cancel-button"
-                // disabled={deleteImage.isPending}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                className="confirm-delete-button"
-                // disabled={deleteImage.isPending}
-              >
-                {/* {deleteImage.isPending ? "Deleting..." : "Confirm Delete"} */}
-                {"Confirm Delete"}
-              </button>
-            </div>
-          </div>
-        )}
+        {isDeleteConfirmOpen && deleteConfirmationDialog}
 
         {/* Add to Album Modal */}
         {showAddToAlbumModal && (

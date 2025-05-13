@@ -170,30 +170,9 @@
     position: relative;
 }
 
-.remove-from-album-button {
-    /* position: absolute; */
-    top: 8px;
-    right: 8px;
-    background-color: rgba(0, 0, 0, 0.6);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    font-size: 18px;
-    line-height: 1;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.album-photo-container:hover .remove-from-album-button {
+/* .album-photo-container:hover .remove-from-album-button {
     opacity: 1;
-}
+} */
 
 /* Remove confirmation dialog */
 .remove-confirm-dialog {

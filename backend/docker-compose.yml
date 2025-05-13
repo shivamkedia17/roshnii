@@ -18,7 +18,7 @@ services:
             # when the container is first initialized (only if the data directory is empty).
             # This allows you to define database initialization scripts like creating tables, indexes, and loading initial data.
             - postgres_data_roshnii_dev:/var/lib/postgresql/data
-        restart: unless-stopped
+        # restart: unless-stopped
         healthcheck:
             test:
                 [
