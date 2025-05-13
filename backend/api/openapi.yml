@@ -1,0 +1,689 @@
+openapi: 3.0.0
+info:
+    title: Roshnii API
+    description: API for managing images, albums, and user authentication
+    version: 1.0.0
+servers:
+    - url: /api
+      description: API base path
+components:
+    securitySchemes:
+        cookieAuth:
+            type: apiKey
+            in: cookie
+            name: auth_token
+    schemas:
+        Error:
+            type: object
+            properties:
+                error:
+                    type: string
+        Album:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                name:
+                    type: string
+                description:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+        AlbumRequest:
+            type: object
+            required:
+                - name
+            properties:
+                name:
+                    type: string
+                description:
+                    type: string
+        Image:
+            type: object
+            properties:
+                id:
+                    type: string
+                user_id:
+                    type: string
+                filename:
+                    type: string
+                storage_path:
+                    type: string
+                content_type:
+                    type: string
+                size:
+                    type: integer
+                    format: int64
+                width:
+                    type: integer
+                height:
+                    type: integer
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+        User:
+            type: object
+            properties:
+                id:
+                    type: string
+                email:
+                    type: string
+                name:
+                    type: string
+                picture_url:
+                    type: string
+                auth_provider:
+                    type: string
+                created_at:
+                    type: string
+                    format: date-time
+                updated_at:
+                    type: string
+                    format: date-time
+        AddImageToAlbumRequest:
+            type: object
+            required:
+                - image_id
+            properties:
+                image_id:
+                    type: string
+security:
+    - cookieAuth: []
+paths:
+    /auth/google/login:
+        get:
+            summary: Initiate Google OAuth login
+            tags:
+                - Authentication
+            security: []
+            responses:
+                "200":
+                    description: Successfully initiated OAuth process
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    auth_url:
+                                        type: string
+                                        description: URL to Google's authorization page
+    /auth/google/callback:
+        get:
+            summary: Handle OAuth callback from Google
+            tags:
+                - Authentication
+            security: []
+            parameters:
+                - name: code
+                  in: query
+                  required: true
+                  schema:
+                      type: string
+                - name: state
+                  in: query
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                "307":
+                    description: Temporary redirect to frontend after successful authentication
+    /auth/google/refresh:
+        post:
+            summary: Refresh authentication token
+            tags:
+                - Authentication
+            security: []
+            responses:
+                "200":
+                    description: Token refreshed successfully
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    message:
+                                        type: string
+                "401":
+                    description: Invalid refresh token
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /auth/google/logout:
+        post:
+            summary: Logout the current user
+            tags:
+                - Authentication
+            responses:
+                "200":
+                    description: Successfully logged out
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    message:
+                                        type: string
+                                        example: Successfully logged out
+    /albums:
+        get:
+            summary: List all albums for the authenticated user
+            tags:
+                - Albums
+            responses:
+                "200":
+                    description: Successfully retrieved albums
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/Album"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+        post:
+            summary: Create a new album
+            tags:
+                - Albums
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/AlbumRequest"
+            responses:
+                "201":
+                    description: Album created successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Album"
+                "400":
+                    description: Invalid request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /albums/{id}:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            summary: Get a specific album by ID
+            tags:
+                - Albums
+            responses:
+                "200":
+                    description: Successfully retrieved album
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Album"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Album not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+        put:
+            summary: Update an existing album
+            tags:
+                - Albums
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/AlbumRequest"
+            responses:
+                "200":
+                    description: Album updated successfully
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    message:
+                                        type: string
+                "400":
+                    description: Invalid request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Album not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+        delete:
+            summary: Delete an album
+            tags:
+                - Albums
+            responses:
+                "200":
+                    description: Album deleted successfully
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    message:
+                                        type: string
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Album not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /albums/{id}/images:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            summary: List all images in an album
+            tags:
+                - Albums
+            responses:
+                "200":
+                    description: Successfully retrieved album images
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/Image"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Album not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+        post:
+            summary: Add an image to an album
+            tags:
+                - Albums
+            requestBody:
+                required: true
+                content:
+                    application/json:
+                        schema:
+                            $ref: "#/components/schemas/AddImageToAlbumRequest"
+            responses:
+                "200":
+                    description: Image added to album successfully
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    message:
+                                        type: string
+                "400":
+                    description: Invalid request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Album or image not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /albums/{id}/images/{image_id}:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+            - name: image_id
+              in: path
+              required: true
+              schema:
+                  type: string
+        delete:
+            summary: Remove an image from an album
+            tags:
+                - Albums
+            responses:
+                "200":
+                    description: Image removed from album successfully
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    message:
+                                        type: string
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Album or image not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /images:
+        get:
+            summary: List all images for the authenticated user
+            tags:
+                - Images
+            responses:
+                "200":
+                    description: Successfully retrieved images
+                    content:
+                        application/json:
+                            schema:
+                                type: array
+                                items:
+                                    $ref: "#/components/schemas/Image"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /images/upload:
+        post:
+            summary: Upload a new image
+            tags:
+                - Images
+            requestBody:
+                required: true
+                content:
+                    multipart/form-data:
+                        schema:
+                            type: object
+                            required:
+                                - file
+                            properties:
+                                file:
+                                    type: string
+                                    format: binary
+            responses:
+                "201":
+                    description: Image uploaded successfully
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Image"
+                "400":
+                    description: Invalid request
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /images/{id}:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            summary: Get an image's metadata by ID
+            tags:
+                - Images
+            responses:
+                "200":
+                    description: Successfully retrieved image metadata
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Image"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Image not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+        delete:
+            summary: Delete an image
+            tags:
+                - Images
+            responses:
+                "200":
+                    description: Image deleted successfully
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    message:
+                                        type: string
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Image not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /images/{id}/download:
+        parameters:
+            - name: id
+              in: path
+              required: true
+              schema:
+                  type: string
+        get:
+            summary: Download an image file
+            tags:
+                - Images
+            responses:
+                "200":
+                    description: Image file
+                    content:
+                        image/*:
+                            schema:
+                                type: string
+                                format: binary
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "404":
+                    description: Image not found
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /me:
+        get:
+            summary: Get the current user's profile
+            tags:
+                - User
+            responses:
+                "200":
+                    description: Successfully retrieved user profile
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/User"
+                "401":
+                    description: Unauthorized
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+                "500":
+                    description: Internal server error
+                    content:
+                        application/json:
+                            schema:
+                                $ref: "#/components/schemas/Error"
+    /health:
+        get:
+            summary: API health check
+            tags:
+                - System
+            security: []
+            responses:
+                "200":
+                    description: API is up and running
+                    content:
+                        application/json:
+                            schema:
+                                type: object
+                                properties:
+                                    status:
+                                        type: string
+                                        example: UP

@@ -1,6 +1,6 @@
 # Local Development
 
-Start the backend.
+Start the frontend dev server:
 
 ```sh
 bun run dev
@@ -8,7 +8,7 @@ bun run dev
 
 Serving the webapp on the same domain as the backend:
 
-- First, build the web app using `bun run build`.
+- First, build the web app using `bun run dbuild`.
 - This will write files to `frontend/dist`
 - `frontend/dist/index.html` is the entry point of the web app.
 - Make sure backend is configured to serve static assets (CSS, JS, favicons, etc.) from the `frontend/dist/assets` directory.

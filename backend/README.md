@@ -67,7 +67,6 @@ Before you begin, ensure you have the following installed:
 *   **Docker Compose:** Usually included with Docker Desktop, otherwise install separately (\url{https://docs.docker.com/compose/install/})
 *   **Go:** Version 1.23 or higher (only needed if running tests outside Docker or modifying code) (\url{https://go.dev/doc/install})
 *   **Git:** For cloning the repository (\url{https://git-scm.com/downloads})
-*   **curl & jq:** Command-line tools used by the API test script (`test_api.sh`).
 *   **Google OAuth Credentials:** You need to create credentials in the Google Cloud Console (\url{https://console.cloud.google.com/apis/credentials}) for a Web Application:
     *   Client ID
     *   Client Secret
@@ -82,10 +81,7 @@ Before you begin, ensure you have the following installed:
     ```
 
 2.  **Create Configuration File (`.env`):**
-    Copy the example environment file provided for the `server` service to the project root (`backend/`) and name it `.env`. This file will be used by Docker Compose for both development and testing setups.
-    ```bash
-    cp services/server/cmd/app.env .env
-    ```
+    Copy the example environment provided below (see later) for the `server` service to the project root (`backend/`) and name it `.env`. This file will be used by Docker Compose for both development and testing setups.
 
 3.  **Edit `.env` File:**
     Open the newly created `.env` file in the `backend/` directory and **update the variables** according to your environment. **This step is crucial.**
@@ -99,17 +95,6 @@ Before you begin, ensure you have the following installed:
             # Example for docker-compose.yml
             POSTGRES_URL=postgresql://roshnii:abcd1234@db:5432/roshnii_db?sslmode=disable
             ```
-
-    *   **Test Database:** (Used by `docker-compose.test.yml`)
-        *   `TEST_POSTGRES_USER`: Username for the *test* database (e.g., `roshnii_test`).
-        *   `TEST_POSTGRES_PASSWORD`: Password for the *test* database (e.g., `testpassword`).
-        *   `TEST_POSTGRES_DB`: Name of the *test* database (e.g., `roshnii_test_db`).
-        *   `TEST_POSTGRES_URL`: The connection string used during integration tests to connect to the *test* database container. Use the service name `test-db` from `docker-compose.test.yml` as the host.
-            ```
-            # Example for docker-compose.test.yml
-            TEST_POSTGRES_URL=postgresql://roshnii_test:testpassword@test-db:5432/roshnii_test_db?sslmode=disable
-            ```
-
     *   **Authentication:**
         *   `GOOGLE_CLIENT_ID`: Your Google OAuth Client ID.
         *   `GOOGLE_CLIENT_SECRET`: Your Google OAuth Client Secret.
@@ -124,14 +109,32 @@ Before you begin, ensure you have the following installed:
         *   `SERVER_HOST`: Host the Go server listens on *inside* the container (usually `0.0.0.0`).
         *   `SERVER_PORT`: Port the Go server listens on (e.g., `8080`).
 
-    *   **Other:**
-        *   `ENVIRONMENT`: Set to `development` for local running/testing to enable the dev login endpoint.
+    * **Sample `.env`:**
+        ```env
+        ENVIRONMENT=production
+
+        POSTGRES_USER=roshnii
+        POSTGRES_PASSWORD=abcd1234
+        POSTGRES_DB=roshnii_db
+        DB_HOST=127.0.0.1
+        DB_PORT=5555
+        POSTGRES_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST}:${DB_PORT}/${POSTGRES_DB}?sslmode=disable
+
+        # Google OAuth Credentials (Get from Google Cloud Console)
+        GOOGLE_CLIENT_ID=blahblahblah.apps.googleusercontent.com
+        GOOGLE_CLIENT_SECRET=SoME-VERY_LONG-S$EC$RET_$tR1Ng
+        TOKEN_DURATION=24h
+        JWT_SECRET="r8Nufh1TwGX1RtwST8SZFewxeTZ8KesZHeLWa1Pj3L9="
+
+        FRONTEND_URL=http://127.0.0.1:8080
+
+        ```
 
 ## Running the Application (Local Development)
 
 1.  **Ensure Docker is running.**
-2.  **Ensure you have created and correctly configured the `.env` file in the `backend/` directory.**
-3.  **Start the services using Docker Compose:**
+2.  **Ensure you have created and correctly configured the `.env` file in the `backend/` directory and `JWT_SECRET` is set.**
+3.  **Start the database using Docker Compose:**
     ```bash
     docker-compose up --build
     ```
@@ -142,12 +145,22 @@ Before you begin, ensure you have the following installed:
         *   Build the `backend` service image.
         *   Start the `backend` service container, connecting it to the `db` container.
         *   Show logs from both containers in your terminal.
+4.  **Compile and Run the microservices:**
+        * For e.g to compile the `server` microservice:
+        ```sh
+            go build ./services/server/cmd/main.go
+        ```
+        This will create an executable called `main` in `backend/`.
+        * Run the compiled service:
+        ```sh
+            ./main
+        ```
 
-4.  **Access the Service:**
-    The backend service should now be running and accessible at `http://localhost:8080`.
+5.  **Access the Service:**
+    The backend service should now be running and accessible at `http://127.0.0.1:8080`.
     You can check the health endpoint:
     ```bash
-    curl http://localhost:8080/health
+    curl http://127.0.0.1:8080/health
     ```
     You should see: `{"status":"UP"}`
 
@@ -158,66 +171,10 @@ Before you begin, ensure you have the following installed:
     ```
     To remove the database volume as well (lose all dev data):
     ```bash
-    docker-compose down -v
+    docker-compose down --volumes
     ```
 
-## Running Tests
-
-There are multiple ways to run the tests:
-
-### 1. Integration Tests (Recommended - via Docker Compose)
-
-This is the most reliable method as it runs tests in an isolated containerized environment with a dedicated test database.
-
-1.  **Ensure Docker is running.**
-2.  **Ensure the `.env` file in the `backend/` directory is configured correctly, especially the `TEST_POSTGRES_*` variables.**
-3.  **Run the test suite using the test-specific Docker Compose file:**
-    ```bash
-    docker-compose -f docker-compose.test.yml up --build --abort-on-container-exit
-    ```
-    *   `-f docker-compose.test.yml`: Specifies the test environment configuration.
-    *   `--build`: Builds necessary images (like the test runner if needed, though often uses base Go).
-    *   `--abort-on-container-exit`: Stops all containers when the test runner container (`backend-test-runner`) finishes, making it easy to see the final test results.
-
-4.  **Cleanup Test Environment:** After the tests complete, tear down the test containers and network:
-    ```bash
-    docker-compose -f docker-compose.test.yml down
-    ```
-
-### 2. Integration Tests (Alternative - Local Go + Docker DB)
-
-This method runs the Go tests directly on your machine but still uses Docker for the test database.
-
-1.  **Ensure Docker is running.**
-2.  **Ensure the `.env` file is configured, particularly `TEST_POSTGRES_URL`.** Make sure the hostname/port in `TEST_POSTGRES_URL` is accessible from your local machine (e.g., `localhost:5433` if using the default port mapping in `docker-compose.test.yml`).
-3.  **Start *only* the test database container:**
-    ```bash
-    docker-compose -f docker-compose.test.yml up -d test-db
-    ```
-    *   `-d`: Runs the container in detached mode.
-4.  **Ensure Go (1.23+) is installed locally.**
-5.  **Navigate to the server command directory and run tests:**
-    ```bash
-    cd services/server/cmd
-    go test -v ./...
-    cd ../../.. # Go back to backend root
-    ```
-6.  **Stop the test database container when finished:**
-    ```bash
-    docker-compose -f docker-compose.test.yml down
-    ```
-
-### 3. API Tests (Shell Script)
-
-This script performs black-box checks against a *running* development instance of the API.
-
-1.  **Ensure the application is running locally using `docker-compose up`.**
-2.  **Ensure `curl` and `jq` are installed.**
-3.  **Run the script from the `backend/` directory:**
-    ```bash
-    ./test_api.sh
-    ```
-    The script will attempt to use the development login, upload/list image metadata, etc.
+    Similarly press `Ctrl+C` to shut down the `server` microservice.
 
 ## Configuration
 
